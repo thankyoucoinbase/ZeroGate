@@ -5,7 +5,7 @@
 
     Reconstructed from deobfuscated bytecode analysis.
     Auth/whitelist is bypassed (placeholder for user to add later).
-    Commands loaded from original remote URL.
+    Commands loaded from GitHub remote URL.
 ]]
 
 ------------------------------------------------------------
@@ -83,66 +83,35 @@ uiElements = {}
 pcall(function()
     if queue_on_teleport or queueonteleport then
         local qot = queue_on_teleport or queueonteleport
-        qot('loadstring(game:HttpGet("https://absent.wtf/AKADMIN.lua"))()')
+        qot('loadstring(game:HttpGet("https://raw.githubusercontent.com/thankyoucoinbase/ZeroGate/refs/heads/main/AK-Admin-Loader.lua"))()')
     end
 end)
 
 ------------------------------------------------------------
--- THEME
+-- THEME (AK Admin blue glass style)
 ------------------------------------------------------------
 local Theme = {
-    black     = Color3.fromRGB(0, 0, 0),
-    bg        = Color3.fromRGB(6, 6, 8),
-    panel     = Color3.fromRGB(10, 10, 13),
-    surface   = Color3.fromRGB(16, 16, 20),
-    line      = Color3.fromRGB(30, 30, 38),
-    btn       = Color3.fromRGB(20, 20, 26),
-    btnHov    = Color3.fromRGB(30, 30, 38),
-    accent    = Color3.fromRGB(255, 255, 255),
-    accentDim = Color3.fromRGB(140, 140, 155),
-    txt       = Color3.fromRGB(230, 230, 235),
-    txtSub    = Color3.fromRGB(120, 120, 130),
-    txtFaint  = Color3.fromRGB(55, 55, 65),
-    green     = Color3.fromRGB(80, 220, 120),
-    red       = Color3.fromRGB(220, 70, 70),
-    yellow    = Color3.fromRGB(220, 185, 50),
+    bg        = Color3.fromRGB(22, 36, 58),
+    bgDark    = Color3.fromRGB(16, 28, 48),
+    panel     = Color3.fromRGB(28, 44, 68),
+    surface   = Color3.fromRGB(34, 52, 78),
+    surfHov   = Color3.fromRGB(42, 62, 92),
+    border    = Color3.fromRGB(50, 72, 105),
+    borderDim = Color3.fromRGB(38, 58, 88),
+    accent    = Color3.fromRGB(80, 160, 255),
+    accentDim = Color3.fromRGB(60, 120, 200),
+    txt       = Color3.fromRGB(220, 230, 245),
+    txtSub    = Color3.fromRGB(140, 165, 200),
+    txtFaint  = Color3.fromRGB(90, 115, 155),
     white     = Color3.fromRGB(255, 255, 255),
+    red       = Color3.fromRGB(220, 70, 70),
+    green     = Color3.fromRGB(80, 220, 120),
+    yellow    = Color3.fromRGB(220, 185, 50),
     -- transparencies
-    bgT       = 0,
-    panelT    = 0,
-    surfaceT  = 0.15,
-    lineT     = 0,
+    bgT       = 0.12,
+    panelT    = 0.08,
+    surfaceT  = 0.25,
 }
-
-------------------------------------------------------------
--- EXECUTOR ACCENT COLOR (per-executor branding)
-------------------------------------------------------------
-local executorAccent = Theme.green
-do
-    local ok, execName = pcall(function()
-        if identifyexecutor then return identifyexecutor() end
-        return nil
-    end)
-    if ok and execName then
-        local brandColors = {
-            Delta     = Color3.fromRGB(160, 80, 255),
-            Xeno      = Color3.fromRGB(255, 80, 200),
-            Velocity  = Color3.fromRGB(220, 220, 235),
-            Potassium = Color3.fromRGB(60, 210, 200),
-            Solara    = Color3.fromRGB(255, 165, 50),
-            Volt      = Color3.fromRGB(100, 180, 255),
-            Wave      = Color3.fromRGB(100, 200, 255),
-            Synapse   = Color3.fromRGB(255, 50, 50),
-            Fluxus    = Color3.fromRGB(80, 160, 255),
-        }
-        for name, color in pairs(brandColors) do
-            if string.find(execName, name, 1, true) then
-                executorAccent = color
-                break
-            end
-        end
-    end
-end
 
 ------------------------------------------------------------
 -- TWEEN PRESETS
@@ -153,8 +122,6 @@ local Tweens = {
     slide   = TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
     bounce  = TweenInfo.new(0.3,  Enum.EasingStyle.Back,  Enum.EasingDirection.Out),
     pulse   = TweenInfo.new(1.2,  Enum.EasingStyle.Sine,  Enum.EasingDirection.InOut, -1, true),
-    cbSlide = TweenInfo.new(0.18, Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
-    intro   = TweenInfo.new(1.1,  Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
     notifIn = TweenInfo.new(0.5,  Enum.EasingStyle.Quart, Enum.EasingDirection.Out),
     notifOut= TweenInfo.new(0.4,  Enum.EasingStyle.Quart, Enum.EasingDirection.In),
 }
@@ -188,10 +155,11 @@ local function addCorner(radius, parent)
     })
 end
 
-local function addStroke(color, transparency, parent)
+local function addStroke(color, transparency, parent, thickness)
     return createElement("UIStroke", {
         Color = color,
-        Transparency = transparency,
+        Transparency = transparency or 0,
+        Thickness = thickness or 1,
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
         Parent = parent,
     })
@@ -251,27 +219,14 @@ end
 task.wait(0.05)
 
 ------------------------------------------------------------
--- LAYOUT CONSTANTS
+-- STATE
 ------------------------------------------------------------
-local BAR_H    = 32
-local BTN_W    = 56
-local BTN_H    = 10
-local CORNER_R = 8
-local CORNER_S = 6
-local CORNER_XS = 4
-local PAD      = 6
-
--- Category tab icons and names
-local TABS = {
-    { icon = "rbxassetid://132440478962916", name = "cmds",  order = 1 },
-    { icon = "rbxassetid://73577105416536",  name = "bar",   order = 2 },
-    { icon = "rbxassetid://99892550804409",  name = "tags",  order = 3 },
-    { icon = "rbxassetid://84437305519060",  name = "join",  order = 4 },
-    { icon = "rbxassetid://101119408272746", name = "auto",  order = 5 },
-}
+local commands = {}
+local commandCount = 0
+local windowVisible = true
 
 ------------------------------------------------------------
--- MAIN SCREEN GUI
+-- SCREEN GUI
 ------------------------------------------------------------
 local screenGui = createElement("ScreenGui", {
     Name = "AKAdminGui",
@@ -282,400 +237,313 @@ local screenGui = createElement("ScreenGui", {
 })
 
 ------------------------------------------------------------
--- STATE
+-- MAIN WINDOW (blue glass panel - 300x420)
 ------------------------------------------------------------
-local commands = {}
-local isBarOpen = false
-local currentTab = "cmds"
-local cmdBarFocused = false
+local WIN_W = 300
+local WIN_H = 420
+local TITLE_H = 42
+local SEARCH_H = 36
+local CORNER = 12
 
-------------------------------------------------------------
--- MAIN PANEL
-------------------------------------------------------------
-local panelWidth = 350
-local panelHeight = BAR_H
-
-local mainPanel = createElement("Frame", {
-    Name = "MainPanel",
-    Size = UDim2.new(0, panelWidth, 0, panelHeight),
-    Position = UDim2.new(1, -(panelWidth + 8), 1, -(BAR_H + 8)),
-    BackgroundColor3 = Theme.panel,
-    BackgroundTransparency = Theme.panelT,
-    BorderSizePixel = 0,
-    ZIndex = 5,
-    Parent = screenGui,
-})
-addCorner(CORNER_R, mainPanel)
-addStroke(Theme.line, 0, mainPanel)
-
-------------------------------------------------------------
--- STARTER GUI (intro white flash overlay)
-------------------------------------------------------------
-local starterOverlay = createElement("Frame", {
-    Name = "StarterOverlay",
-    Size = UDim2.new(0, 0, 1, 0),
-    BackgroundColor3 = Theme.white,
-    BackgroundTransparency = 0.85,
-    BorderSizePixel = 0,
-    ZIndex = 10,
-    Parent = mainPanel,
-})
-addCorner(CORNER_R, starterOverlay)
-
--- Intro animation: expand overlay then fade out
-local introTween = playTween(starterOverlay, Tweens.intro, {
-    Size = UDim2.new(1, 0, 1, 0),
-})
-introTween.Completed:Connect(function()
-    playTween(starterOverlay, Tweens.med, {
-        BackgroundTransparency = 1,
-    }).Completed:Connect(function()
-        starterOverlay:Destroy()
-    end)
-end)
-
-------------------------------------------------------------
--- COMMAND BAR LABEL (text at top)
-------------------------------------------------------------
-local barLabel = createElement("TextLabel", {
-    Name = "BarLabel",
-    Size = UDim2.new(1, 0, 1, 0),
-    BackgroundTransparency = 1,
-    Text = "AK ADMIN",
-    TextColor3 = Theme.txtSub,
-    TextSize = 11,
-    Font = Enum.Font.GothamBold,
-    ZIndex = 6,
-    Parent = mainPanel,
-})
-
-------------------------------------------------------------
--- STATUS BAR CONTAINER
-------------------------------------------------------------
-local statusContainer = createElement("Frame", {
-    Name = "StatusContainer",
-    Size = UDim2.new(1, 0, 0, 13),
-    BackgroundTransparency = 1,
-    BorderSizePixel = 0,
-    LayoutOrder = 1,
-    Parent = mainPanel,
-})
-addListLayout(
-    Enum.FillDirection.Horizontal,
-    Enum.HorizontalAlignment.Left,
-    nil,
-    4,
-    statusContainer
-)
-
--- Green status dot (pulsing)
-local greenDot = createElement("Frame", {
-    Name = "GreenDot",
-    Size = UDim2.new(0, 5, 0, 5),
-    BackgroundColor3 = Theme.green,
-    BorderSizePixel = 0,
-    LayoutOrder = 1,
-    Parent = statusContainer,
-})
-addCorner(10, greenDot)
-playTween(greenDot, Tweens.pulse, {
-    BackgroundColor3 = Color3.fromRGB(130, 255, 160),
-})
-
--- Connected label
-createElement("TextLabel", {
-    Name = "ConnectedLabel",
-    Size = UDim2.new(0, 44, 1, 0),
-    BackgroundTransparency = 1,
-    Text = "Connected",
-    TextColor3 = Theme.green,
-    TextSize = 11,
-    Font = Enum.Font.GothamMedium,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    LayoutOrder = 2,
-    Parent = statusContainer,
-})
-
--- Separator line
-createElement("Frame", {
-    Size = UDim2.new(0, 1, 0, 9),
-    BackgroundColor3 = Theme.line,
-    BorderSizePixel = 0,
-    LayoutOrder = 3,
-    Parent = statusContainer,
-})
-
--- Yellow dot
-local yellowDot = createElement("Frame", {
-    Name = "YellowDot",
-    Size = UDim2.new(0, 5, 0, 5),
-    BackgroundColor3 = Theme.yellow,
-    BorderSizePixel = 0,
-    LayoutOrder = 4,
-    Parent = statusContainer,
-})
-addCorner(10, yellowDot)
-
--- Info label
-createElement("TextLabel", {
-    Name = "InfoLabel",
-    Size = UDim2.new(0, 52, 1, 0),
-    BackgroundTransparency = 1,
-    Text = "Press F6",
-    TextColor3 = Theme.yellow,
-    TextSize = 11,
-    Font = Enum.Font.GothamMedium,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    LayoutOrder = 5,
-    Parent = statusContainer,
-})
-
-------------------------------------------------------------
--- EXPANDABLE PANEL (slides down)
-------------------------------------------------------------
-local expandPanel = createElement("Frame", {
-    Name = "ExpandPanel",
-    Size = UDim2.new(1, 0, 0, 0),
-    Position = UDim2.new(0, 0, 0, BAR_H),
+local mainFrame = createElement("Frame", {
+    Name = "MainFrame",
+    Size = UDim2.new(0, WIN_W, 0, WIN_H),
+    Position = UDim2.new(0.5, -(WIN_W/2), 0.5, -(WIN_H/2)),
     BackgroundColor3 = Theme.bg,
     BackgroundTransparency = Theme.bgT,
     BorderSizePixel = 0,
     ClipsDescendants = true,
-    ZIndex = 4,
-    Parent = mainPanel,
+    Parent = screenGui,
 })
-addCorner(CORNER_R, expandPanel)
+addCorner(CORNER, mainFrame)
+addStroke(Theme.border, 0.3, mainFrame, 1.5)
+
+-- Gradient overlay for the glass effect
+local gradient = createElement("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 55, 85)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(25, 42, 68)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 32, 55)),
+    }),
+    Rotation = 160,
+    Parent = mainFrame,
+})
 
 ------------------------------------------------------------
--- TAB BAR
+-- TITLE BAR
 ------------------------------------------------------------
-local tabBar = createElement("Frame", {
-    Name = "TabBar",
-    Size = UDim2.new(1, 0, 0, 30),
+local titleBar = createElement("Frame", {
+    Name = "TitleBar",
+    Size = UDim2.new(1, 0, 0, TITLE_H),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    Parent = expandPanel,
-})
-addListLayout(
-    Enum.FillDirection.Horizontal,
-    Enum.HorizontalAlignment.Center,
-    Enum.VerticalAlignment.Center,
-    4,
-    tabBar
-)
-addPadding(PAD, PAD, 0, 0, tabBar)
-
-local tabButtons = {}
-for _, tabInfo in ipairs(TABS) do
-    local tabBtn = createElement("ImageButton", {
-        Name = tabInfo.name,
-        Size = UDim2.new(0, 28, 0, 28),
-        BackgroundColor3 = Theme.btn,
-        BackgroundTransparency = 0,
-        BorderSizePixel = 0,
-        Image = tabInfo.icon,
-        ImageColor3 = Theme.txtSub,
-        ScaleType = Enum.ScaleType.Fit,
-        LayoutOrder = tabInfo.order,
-        AutoButtonColor = false,
-        Parent = tabBar,
-    })
-    addCorner(CORNER_S, tabBtn)
-
-    tabBtn.MouseEnter:Connect(function()
-        playTween(tabBtn, Tweens.fast, { BackgroundColor3 = Theme.btnHov })
-    end)
-    tabBtn.MouseLeave:Connect(function()
-        playTween(tabBtn, Tweens.fast, { BackgroundColor3 = Theme.btn })
-    end)
-    tabBtn.MouseButton1Click:Connect(function()
-        playSfx(sfxClick)
-        currentTab = tabInfo.name
-        for _, btn in pairs(tabButtons) do
-            local isActive = btn.Name == tabInfo.name
-            playTween(btn, Tweens.fast, {
-                ImageColor3 = isActive and Theme.accent or Theme.txtSub,
-            })
-        end
-    end)
-    tabButtons[tabInfo.name] = tabBtn
-end
-
--- Activate default tab
-if tabButtons["cmds"] then
-    tabButtons["cmds"].ImageColor3 = Theme.accent
-end
-
-------------------------------------------------------------
--- TAB SEPARATOR
-------------------------------------------------------------
-createElement("Frame", {
-    Name = "TabSep",
-    Size = UDim2.new(1, -12, 0, 1),
-    Position = UDim2.new(0, 6, 0, 30),
-    BackgroundColor3 = Theme.line,
-    BorderSizePixel = 0,
-    Parent = expandPanel,
+    Parent = mainFrame,
 })
 
-------------------------------------------------------------
--- COMMAND LIST SCROLL
-------------------------------------------------------------
-local cmdScroll = createElement("ScrollingFrame", {
-    Name = "CmdScroll",
-    Size = UDim2.new(1, 0, 1, -34),
-    Position = UDim2.new(0, 0, 0, 34),
+-- AK Logo icon
+local logoIcon = createElement("ImageLabel", {
+    Name = "LogoIcon",
+    Size = UDim2.new(0, 24, 0, 24),
+    Position = UDim2.new(0, 12, 0.5, 0),
+    AnchorPoint = Vector2.new(0, 0.5),
     BackgroundTransparency = 1,
-    BorderSizePixel = 0,
-    ScrollBarThickness = 3,
-    ScrollBarImageColor3 = Theme.line,
-    CanvasSize = UDim2.new(0, 0, 0, 0),
-    AutomaticCanvasSize = Enum.AutomaticSize.Y,
-    Parent = expandPanel,
+    Image = "rbxassetid://132440478962916",
+    ImageColor3 = Theme.accent,
+    ScaleType = Enum.ScaleType.Fit,
+    Parent = titleBar,
 })
-addListLayout(
-    Enum.FillDirection.Vertical,
-    Enum.HorizontalAlignment.Center,
-    nil,
-    2,
-    cmdScroll
-)
-addPadding(PAD, PAD, 4, 4, cmdScroll)
 
-------------------------------------------------------------
--- COMMAND INPUT (TextBox in the bar)
-------------------------------------------------------------
-local cmdPrefix = createElement("TextLabel", {
-    Name = "CmdPrefix",
-    Size = UDim2.new(0, 20, 1, 0),
-    Position = UDim2.new(0, 8, 0, 0),
+-- Title text
+local titleLabel = createElement("TextLabel", {
+    Name = "TitleLabel",
+    Size = UDim2.new(1, -120, 1, 0),
+    Position = UDim2.new(0, 42, 0, 0),
     BackgroundTransparency = 1,
-    Text = ">",
-    TextColor3 = Theme.green,
-    TextSize = 14,
+    Text = "AK Commands",
+    TextColor3 = Theme.txt,
+    TextSize = 16,
     Font = Enum.Font.GothamBold,
     TextXAlignment = Enum.TextXAlignment.Left,
-    ZIndex = 7,
-    Parent = mainPanel,
+    Parent = titleBar,
 })
 
-local cmdInput = createElement("TextBox", {
-    Name = "CmdInput",
-    Size = UDim2.new(1, -90, 1, 0),
-    Position = UDim2.new(0, 30, 0, 0),
+-- Settings button (gear)
+local settingsBtn = createElement("ImageButton", {
+    Name = "SettingsBtn",
+    Size = UDim2.new(0, 20, 0, 20),
+    Position = UDim2.new(1, -72, 0.5, 0),
+    AnchorPoint = Vector2.new(0, 0.5),
+    BackgroundTransparency = 1,
+    Image = "rbxassetid://73577105416536",
+    ImageColor3 = Theme.txtSub,
+    AutoButtonColor = false,
+    Parent = titleBar,
+})
+settingsBtn.MouseEnter:Connect(function()
+    playTween(settingsBtn, Tweens.fast, { ImageColor3 = Theme.txt })
+end)
+settingsBtn.MouseLeave:Connect(function()
+    playTween(settingsBtn, Tweens.fast, { ImageColor3 = Theme.txtSub })
+end)
+
+-- Minimize button
+local minimizeBtn = createElement("TextButton", {
+    Name = "MinimizeBtn",
+    Size = UDim2.new(0, 20, 0, 20),
+    Position = UDim2.new(1, -48, 0.5, 0),
+    AnchorPoint = Vector2.new(0, 0.5),
+    BackgroundTransparency = 1,
+    Text = "-",
+    TextColor3 = Theme.txtSub,
+    TextSize = 18,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+    Parent = titleBar,
+})
+minimizeBtn.MouseEnter:Connect(function()
+    playTween(minimizeBtn, Tweens.fast, { TextColor3 = Theme.txt })
+end)
+minimizeBtn.MouseLeave:Connect(function()
+    playTween(minimizeBtn, Tweens.fast, { TextColor3 = Theme.txtSub })
+end)
+
+-- Close button
+local closeBtn = createElement("TextButton", {
+    Name = "CloseBtn",
+    Size = UDim2.new(0, 20, 0, 20),
+    Position = UDim2.new(1, -24, 0.5, 0),
+    AnchorPoint = Vector2.new(0, 0.5),
+    BackgroundTransparency = 1,
+    Text = "X",
+    TextColor3 = Theme.txtSub,
+    TextSize = 14,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+    Parent = titleBar,
+})
+closeBtn.MouseEnter:Connect(function()
+    playTween(closeBtn, Tweens.fast, { TextColor3 = Theme.red })
+end)
+closeBtn.MouseLeave:Connect(function()
+    playTween(closeBtn, Tweens.fast, { TextColor3 = Theme.txtSub })
+end)
+
+-- Title separator line
+createElement("Frame", {
+    Name = "TitleSep",
+    Size = UDim2.new(1, -24, 0, 1),
+    Position = UDim2.new(0, 12, 0, TITLE_H),
+    BackgroundColor3 = Theme.border,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+    Parent = mainFrame,
+})
+
+------------------------------------------------------------
+-- SEARCH BAR
+------------------------------------------------------------
+local searchContainer = createElement("Frame", {
+    Name = "SearchContainer",
+    Size = UDim2.new(1, -24, 0, SEARCH_H),
+    Position = UDim2.new(0, 12, 0, TITLE_H + 8),
+    BackgroundColor3 = Theme.bgDark,
+    BackgroundTransparency = 0.3,
+    BorderSizePixel = 0,
+    Parent = mainFrame,
+})
+addCorner(8, searchContainer)
+addStroke(Theme.borderDim, 0.4, searchContainer)
+
+-- Search icon
+createElement("TextLabel", {
+    Name = "SearchIcon",
+    Size = UDim2.new(0, 24, 1, 0),
+    Position = UDim2.new(0, 8, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "Q",
+    TextColor3 = Theme.txtFaint,
+    TextSize = 14,
+    Font = Enum.Font.GothamBold,
+    Parent = searchContainer,
+})
+
+-- Search input
+local searchInput = createElement("TextBox", {
+    Name = "SearchInput",
+    Size = UDim2.new(1, -40, 1, 0),
+    Position = UDim2.new(0, 32, 0, 0),
     BackgroundTransparency = 1,
     Text = "",
     TextColor3 = Theme.txt,
-    PlaceholderColor3 = Theme.txtSub,
-    PlaceholderText = "Type a command...",
+    PlaceholderColor3 = Theme.txtFaint,
+    PlaceholderText = "Search Commands (0)",
     TextSize = 13,
     Font = Enum.Font.GothamMedium,
     TextXAlignment = Enum.TextXAlignment.Left,
     ClearTextOnFocus = false,
-    ZIndex = 7,
-    Parent = mainPanel,
+    Parent = searchContainer,
 })
 
 ------------------------------------------------------------
--- TOGGLE BUTTON (expand/collapse panel)
+-- COMMAND SCROLL LIST
 ------------------------------------------------------------
-local toggleBtn = createElement("TextButton", {
-    Name = "ToggleBtn",
-    Size = UDim2.new(0, 52, 0, 22),
-    Position = UDim2.new(1, -58, 0.5, 0),
-    AnchorPoint = Vector2.new(0, 0.5),
-    BackgroundColor3 = Theme.btn,
-    BackgroundTransparency = 0,
+local scrollTop = TITLE_H + SEARCH_H + 20
+
+local cmdScroll = createElement("ScrollingFrame", {
+    Name = "CmdScroll",
+    Size = UDim2.new(1, -20, 1, -(scrollTop + 8)),
+    Position = UDim2.new(0, 10, 0, scrollTop),
+    BackgroundTransparency = 1,
     BorderSizePixel = 0,
-    AutoButtonColor = false,
-    Text = "cmds",
-    TextColor3 = Theme.txtSub,
-    TextSize = 10,
-    Font = Enum.Font.GothamBold,
-    ZIndex = 7,
-    Parent = mainPanel,
+    ScrollBarThickness = 4,
+    ScrollBarImageColor3 = Theme.border,
+    ScrollBarImageTransparency = 0.3,
+    CanvasSize = UDim2.new(0, 0, 0, 0),
+    AutomaticCanvasSize = Enum.AutomaticSize.Y,
+    Parent = mainFrame,
 })
-addCorner(CORNER_S, toggleBtn)
+
+addListLayout(
+    Enum.FillDirection.Vertical,
+    Enum.HorizontalAlignment.Center,
+    nil,
+    4,
+    cmdScroll
+)
+addPadding(2, 2, 2, 2, cmdScroll)
 
 ------------------------------------------------------------
--- PANEL EXPAND / COLLAPSE LOGIC
+-- DRAGGING
 ------------------------------------------------------------
-local EXPAND_H = 260
+do
+    local isDragging = false
+    local dragStart = nil
+    local startPos = nil
 
-local function expandBar()
-    if isBarOpen then return end
-    isBarOpen = true
-    playSfx(sfxClick)
-    playTween(mainPanel, Tweens.slide, {
-        Size = UDim2.new(0, panelWidth, 0, BAR_H + EXPAND_H),
-        Position = UDim2.new(1, -(panelWidth + 8), 1, -(BAR_H + EXPAND_H + 8)),
-    })
-    playTween(expandPanel, Tweens.slide, {
-        Size = UDim2.new(1, 0, 0, EXPAND_H),
-    })
-    playTween(toggleBtn, Tweens.fast, {
-        BackgroundColor3 = Theme.surface,
-    })
+    titleBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isDragging = true
+            dragStart = input.Position
+            startPos = mainFrame.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    isDragging = false
+                end
+            end)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local delta = input.Position - dragStart
+            mainFrame.Position = UDim2.new(
+                startPos.X.Scale, startPos.X.Offset + delta.X,
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
 end
 
-local function collapseBar()
-    if not isBarOpen then return end
-    isBarOpen = false
-    playSfx(sfxClick)
-    playTween(mainPanel, Tweens.slide, {
-        Size = UDim2.new(0, panelWidth, 0, BAR_H),
-        Position = UDim2.new(1, -(panelWidth + 8), 1, -(BAR_H + 8)),
-    })
-    playTween(expandPanel, Tweens.slide, {
-        Size = UDim2.new(1, 0, 0, 0),
-    })
-    playTween(toggleBtn, Tweens.fast, {
-        BackgroundColor3 = Theme.btn,
-    })
-end
+------------------------------------------------------------
+-- MINIMIZE / CLOSE
+------------------------------------------------------------
+local isMinimized = false
 
-toggleBtn.MouseButton1Click:Connect(function()
-    if isBarOpen then
-        collapseBar()
+minimizeBtn.MouseButton1Click:Connect(function()
+    playSfx(sfxClick)
+    isMinimized = not isMinimized
+    if isMinimized then
+        playTween(mainFrame, Tweens.slide, {
+            Size = UDim2.new(0, WIN_W, 0, TITLE_H + 4),
+        })
+        minimizeBtn.Text = "+"
     else
-        expandBar()
+        playTween(mainFrame, Tweens.slide, {
+            Size = UDim2.new(0, WIN_W, 0, WIN_H),
+        })
+        minimizeBtn.Text = "-"
     end
 end)
 
-toggleBtn.MouseEnter:Connect(function()
-    if not isBarOpen then
-        playTween(toggleBtn, Tweens.fast, { BackgroundColor3 = Theme.btnHov })
-    end
-end)
-toggleBtn.MouseLeave:Connect(function()
-    if not isBarOpen then
-        playTween(toggleBtn, Tweens.fast, { BackgroundColor3 = Theme.btn })
-    end
+closeBtn.MouseButton1Click:Connect(function()
+    playSfx(sfxClick)
+    windowVisible = false
+    mainFrame.Visible = false
 end)
 
 ------------------------------------------------------------
--- F6 KEYBIND (focus the command input)
+-- F6 KEYBIND (toggle window)
 ------------------------------------------------------------
 local TOGGLE_KEY = Enum.KeyCode.F6
 
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.KeyCode == TOGGLE_KEY then
-        if cmdBarFocused then
-            cmdInput:ReleaseFocus()
-        else
-            cmdInput:CaptureFocus()
+        windowVisible = not windowVisible
+        mainFrame.Visible = windowVisible
+        if windowVisible and isMinimized then
+            isMinimized = false
+            mainFrame.Size = UDim2.new(0, WIN_W, 0, WIN_H)
+            minimizeBtn.Text = "-"
         end
     end
 end)
 
-cmdInput.Focused:Connect(function()
-    cmdBarFocused = true
-    playTween(cmdPrefix, Tweens.fast, { TextColor3 = executorAccent })
-end)
-
-cmdInput:GetPropertyChangedSignal("Text"):Connect(function()
-    -- future: live command suggestions / filtering
+------------------------------------------------------------
+-- SEARCH FILTERING
+------------------------------------------------------------
+searchInput:GetPropertyChangedSignal("Text"):Connect(function()
+    local query = string.lower(searchInput.Text)
+    for _, child in ipairs(cmdScroll:GetChildren()) do
+        if child:IsA("Frame") then
+            if query == "" then
+                child.Visible = true
+            else
+                child.Visible = string.find(string.lower(child.Name), query, 1, true) ~= nil
+            end
+        end
+    end
 end)
 
 ------------------------------------------------------------
@@ -688,7 +556,6 @@ local function showNotification(title, body, duration)
 
     local playerGui = localPlayer:WaitForChild("PlayerGui")
 
-    -- Find or create notification container
     local notifGui = playerGui:FindFirstChild("AKAdminNotificationGui")
     if not notifGui then
         notifGui = createElement("ScreenGui", {
@@ -698,7 +565,6 @@ local function showNotification(title, body, duration)
         })
     end
 
-    -- Calculate Y offset for stacking
     local yPos = notifYOffset
     notifYOffset = notifYOffset + 70
 
@@ -706,55 +572,59 @@ local function showNotification(title, body, duration)
         Name = "Notification",
         Size = UDim2.new(0, 320, 0, 60),
         Position = UDim2.new(1, 10, 0, yPos),
-        BackgroundColor3 = Theme.black,
-        BackgroundTransparency = 0.3,
+        BackgroundColor3 = Theme.bgDark,
+        BackgroundTransparency = 0.1,
         BorderSizePixel = 0,
         ZIndex = 100,
         Parent = notifGui,
     })
     addCorner(12, notifFrame)
+    addStroke(Theme.border, 0.3, notifFrame)
 
-    -- Avatar image (direct URL, no yielding)
+    -- Avatar image
     local avatarImg = createElement("ImageLabel", {
         Name = "Avatar",
         Size = UDim2.new(0, 44, 0, 44),
         Position = UDim2.new(0, 8, 0, 8),
-        BackgroundTransparency = 1,
+        BackgroundColor3 = Theme.surface,
+        BackgroundTransparency = 0.5,
         BorderSizePixel = 0,
-        Image = string.format(HEADSHOT_URL, localPlayer.UserId),
+        ImageTransparency = 0,
+        ScaleType = Enum.ScaleType.Crop,
         ZIndex = 101,
         Parent = notifFrame,
     })
-    addCorner(8, avatarImg)
+    addCorner(22, avatarImg)
+
+    pcall(function()
+        avatarImg.Image = string.format(HEADSHOT_URL, localPlayer.UserId)
+    end)
 
     -- Title
     createElement("TextLabel", {
-        Name = "Title",
-        Size = UDim2.new(0, 250, 0, 16),
+        Size = UDim2.new(1, -64, 0, 20),
         Position = UDim2.new(0, 60, 0, 8),
         BackgroundTransparency = 1,
-        Font = Enum.Font.GothamBold,
-        TextSize = 12,
-        TextColor3 = Theme.white,
-        TextTransparency = 0.5,
-        TextXAlignment = Enum.TextXAlignment.Left,
         Text = title,
+        TextColor3 = Theme.accent,
+        TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
         ZIndex = 101,
         Parent = notifFrame,
     })
 
     -- Body
     createElement("TextLabel", {
-        Name = "Body",
-        Size = UDim2.new(0, 250, 0, 28),
-        Position = UDim2.new(0, 60, 0, 24),
+        Size = UDim2.new(1, -64, 0, 20),
+        Position = UDim2.new(0, 60, 0, 28),
         BackgroundTransparency = 1,
-        Font = Enum.Font.Gotham,
-        TextSize = 11,
-        TextColor3 = Theme.white,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        TextWrapped = true,
         Text = body,
+        TextColor3 = Theme.txtSub,
+        TextSize = 12,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextTruncate = Enum.TextTruncate.AtEnd,
         ZIndex = 101,
         Parent = notifFrame,
     })
@@ -782,30 +652,33 @@ end
 local function buildCmdEntry(name, description)
     local entry = createElement("Frame", {
         Name = name,
-        Size = UDim2.new(1, 0, 0, 28),
+        Size = UDim2.new(1, 0, 0, 36),
         BackgroundColor3 = Theme.surface,
         BackgroundTransparency = Theme.surfaceT,
         BorderSizePixel = 0,
         Parent = cmdScroll,
     })
-    addCorner(CORNER_XS, entry)
+    addCorner(8, entry)
+    addStroke(Theme.borderDim, 0.6, entry)
 
-    createElement("TextLabel", {
-        Size = UDim2.new(0, 80, 1, 0),
-        Position = UDim2.new(0, 8, 0, 0),
+    -- Command name
+    local cmdLabel = createElement("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 18),
+        Position = UDim2.new(0, 10, 0, description and 4 or 9),
         BackgroundTransparency = 1,
         Text = "!" .. name,
-        TextColor3 = Theme.accent,
-        TextSize = 12,
-        Font = Enum.Font.GothamBold,
+        TextColor3 = Theme.txt,
+        TextSize = 13,
+        Font = Enum.Font.GothamMedium,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = entry,
     })
 
-    if description then
+    -- Description (if provided)
+    if description and description ~= "" then
         createElement("TextLabel", {
-            Size = UDim2.new(1, -96, 1, 0),
-            Position = UDim2.new(0, 92, 0, 0),
+            Size = UDim2.new(1, -16, 0, 14),
+            Position = UDim2.new(0, 10, 0, 20),
             BackgroundTransparency = 1,
             Text = description,
             TextColor3 = Theme.txtFaint,
@@ -817,14 +690,21 @@ local function buildCmdEntry(name, description)
         })
     end
 
+    -- Hover effect
     entry.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement then
-            playTween(entry, Tweens.fast, { BackgroundTransparency = 0 })
+            playTween(entry, Tweens.fast, {
+                BackgroundColor3 = Theme.surfHov,
+                BackgroundTransparency = 0.15,
+            })
         end
     end)
     entry.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement then
-            playTween(entry, Tweens.fast, { BackgroundTransparency = Theme.surfaceT })
+            playTween(entry, Tweens.fast, {
+                BackgroundColor3 = Theme.surface,
+                BackgroundTransparency = Theme.surfaceT,
+            })
         end
     end)
 
@@ -832,15 +712,13 @@ local function buildCmdEntry(name, description)
 end
 
 ------------------------------------------------------------
--- COMMAND EXECUTION
+-- COMMAND EXECUTION (via chat or F6 command bar)
 ------------------------------------------------------------
 local function executeCommand(text)
     if text == "" then return end
 
-    -- Strip leading/trailing whitespace
     text = text:match("^%s*(.-)%s*$") or text
 
-    -- Parse command and args
     local parts = {}
     for word in text:gmatch("%S+") do
         table.insert(parts, word)
@@ -860,7 +738,6 @@ local function executeCommand(text)
         return
     end
 
-    -- Execute with pcall
     local args = {}
     for i = 2, #parts do
         table.insert(args, parts[i])
@@ -875,16 +752,24 @@ local function executeCommand(text)
     return true
 end
 
--- Handle command input
-cmdInput.FocusLost:Connect(function(enterPressed)
-    cmdBarFocused = false
-    playTween(cmdPrefix, Tweens.fast, { TextColor3 = Theme.green })
-
-    if enterPressed and cmdInput.Text ~= "" then
-        local text = cmdInput.Text
-        cmdInput.Text = ""
-        playSfx(sfxOk)
-        executeCommand(text)
+------------------------------------------------------------
+-- CHAT COMMAND HOOK (! prefix in chat)
+------------------------------------------------------------
+pcall(function()
+    local textChatService = getService("TextChatService")
+    local channels = textChatService:WaitForChild("TextChannels", 10)
+    if channels then
+        local general = channels:FindFirstChild("RBXGeneral")
+        if general then
+            general:ConnectLocal(function(msg)
+                if msg and msg.Text then
+                    local text = msg.Text
+                    if text:sub(1, 1) == "!" then
+                        executeCommand(text)
+                    end
+                end
+            end)
+        end
     end
 end)
 
@@ -910,8 +795,6 @@ task.spawn(function()
     end
 
     -- The original loader's VM environment had custom concat handling.
-    -- cmds.lua's internal VM tries to concatenate the descendants arg with strings.
-    -- We wrap the descendants table so it supports concatenation via __concat.
     local descendants = setmetatable({}, {
         __concat = function(a, b)
             if type(a) == "table" then
@@ -928,7 +811,6 @@ task.spawn(function()
             return tostring(#rawDescendants)
         end,
     })
-    -- Copy array entries so ipairs/iteration works
     for i, v in ipairs(rawDescendants) do
         descendants[i] = v
     end
@@ -942,11 +824,10 @@ task.spawn(function()
         return h
     end
 
-    -- Build integrity key from workspace state
     local hashStr = tostring(#rawDescendants) .. ":" .. tostring(serverTime) .. ":0"
     local hash = computeHash(hashStr)
 
-    -- Load commands from GitHub or local fallback
+    -- Register commands into UI + command table
     local function registerCmds(result)
         if type(result) == "table" then
             local count = 0
@@ -989,12 +870,20 @@ task.spawn(function()
             local count = registerCmds(result)
             if count > 0 then
                 cmdsLoaded = true
-                showNotification("AK ADMIN", count .. " commands loaded (remote)", 3)
+                commandCount = count
+                searchInput.PlaceholderText = "Search Commands (" .. count .. ")"
+                showNotification("AK ADMIN", count .. " commands loaded", 3)
             elseif type(result) == "function" then
                 local fnResult = result(descendants, serverTime, hash)
                 count = registerCmds(fnResult)
-                if count > 0 then cmdsLoaded = true end
+                if count > 0 then
+                    cmdsLoaded = true
+                    commandCount = count
+                    searchInput.PlaceholderText = "Search Commands (" .. count .. ")"
+                end
             end
+        else
+            warn("[AK Admin] Remote load failed: " .. tostring(result))
         end
     end
 
@@ -1010,6 +899,8 @@ task.spawn(function()
                         local count = registerCmds(localResult)
                         if count > 0 then
                             cmdsLoaded = true
+                            commandCount = count
+                            searchInput.PlaceholderText = "Search Commands (" .. count .. ")"
                             showNotification("AK ADMIN", count .. " commands loaded (local)", 3)
                             print("[AK Admin] Loaded " .. count .. " commands from local AKAdmin_cmds.lua")
                         end
@@ -1021,7 +912,7 @@ task.spawn(function()
 
     if not cmdsLoaded then
         warn("[AK Admin] Failed to load commands from any source")
-        showNotification("AK ADMIN", "No commands loaded. Place AKAdmin_cmds.lua in scripts folder.", 5)
+        showNotification("AK ADMIN", "No commands loaded. Check console.", 5)
     end
 
     -- Also try loading extended baseplate prompt
@@ -1046,22 +937,6 @@ task.delay(1, function()
 end)
 
 ------------------------------------------------------------
--- WELCOME MESSAGE SETUP (TextChatService integration)
-------------------------------------------------------------
-pcall(function()
-    local textChatService = getService("TextChatService")
-    local channels = textChatService:WaitForChild("TextChannels", 10)
-    if channels then
-        local general = channels:FindFirstChild("RBXGeneral")
-        if general then
-            general.MessageReceived:Connect(function(msg)
-                -- Future: handle chat commands here
-            end)
-        end
-    end
-end)
-
-------------------------------------------------------------
 -- CONFIG PERSISTENCE (if executor supports file system)
 ------------------------------------------------------------
 pcall(function()
@@ -1083,5 +958,6 @@ Players.PlayerRemoving:Connect(function(plr)
     end
 end)
 
-print("[AK Admin] Loaded successfully. Press F6 to focus the command bar.")
+print("[AK Admin] Loaded successfully. Press F6 to toggle the command window.")
+print("[AK Admin] Use !command in chat or F6 command window.")
 print("[AK Admin] Discord: " .. DISCORD_URL)
