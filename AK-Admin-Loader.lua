@@ -608,6 +608,7 @@ local function expandBar()
     playSfx(sfxClick)
     playTween(mainPanel, Tweens.slide, {
         Size = UDim2.new(0, panelWidth, 0, BAR_H + EXPAND_H),
+        Position = UDim2.new(1, -(panelWidth + 8), 1, -(BAR_H + EXPAND_H + 8)),
     })
     playTween(expandPanel, Tweens.slide, {
         Size = UDim2.new(1, 0, 0, EXPAND_H),
@@ -623,6 +624,7 @@ local function collapseBar()
     playSfx(sfxClick)
     playTween(mainPanel, Tweens.slide, {
         Size = UDim2.new(0, panelWidth, 0, BAR_H),
+        Position = UDim2.new(1, -(panelWidth + 8), 1, -(BAR_H + 8)),
     })
     playTween(expandPanel, Tweens.slide, {
         Size = UDim2.new(1, 0, 0, 0),
