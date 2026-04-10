@@ -708,251 +708,512 @@ task.spawn(function()
 end)
 
 ------------------------------------------------------------
--- OVERHEAD TAG SYSTEM
+-- OVERHEAD TAG SYSTEM (PxTag-style with cross-client sync)
 ------------------------------------------------------------
-local TAG_PRESETS = {
-    { name = "AK STAFF",  icon = "rbxassetid://6031280882", color = Color3.fromRGB(90, 90, 95) },
-    { name = "AK ADMIN",  icon = "rbxassetid://6031094670", color = Color3.fromRGB(50, 90, 160) },
-    { name = "AK VIP",    icon = "rbxassetid://6034287594", color = Color3.fromRGB(180, 140, 40) },
-    { name = "AK USER",   icon = "rbxassetid://6034509993", color = Color3.fromRGB(60, 130, 100) },
-    { name = "OWNER",     icon = "rbxassetid://6031094670", color = Color3.fromRGB(160, 50, 50) },
-}
+local FULL_W, FULL_H = 200, 42
+local MINI_W, MINI_H = 50, 50
+local FULL_DIST, SHRINK_START = 30, 55
+local BB_OFFSET = Vector3.new(0, 3.2, 0)
+local AK_ANIM_ID = "rbxassetid://182393478"
+local AK_ANIM_SPEED = 1.42
+local AK_TAG_ATTR = "AKTagIdx"
 
-local currentTag = nil -- the BillboardGui instance
-local currentTagPreset = nil -- which preset is active (for respawn + broadcast)
-local remoteTags = {} -- userId -> BillboardGui (tags on other players)
-
--- Signal prefix: AK tag broadcasts use this pattern in chat
--- Format: "aktag:<tagIndex>" or "aktag:0" for remove
--- The message gets Roblox-filtered but other AK clients read the raw text
-local TAG_SIGNAL_PREFIX = "aktag:"
-
-local function removeTag()
-    if currentTag then
-        currentTag:Destroy()
-        currentTag = nil
-    end
-    currentTagPreset = nil
+local function lerpN(a, b, t) return a + (b - a) * t end
+local function lerpColor(a, b, t)
+    return Color3.new(lerpN(a.R, b.R, t), lerpN(a.G, b.G, t), lerpN(a.B, b.B, t))
 end
 
-local function applyTagToHead(head, preset, playerName)
-    -- Remove existing tag on this head
-    local existing = head:FindFirstChild("AKTag")
-    if existing then existing:Destroy() end
+local TAG_PRESETS = {
+    { name = "AK STAFF", label = "Staff",
+      icon = "rbxassetid://6031280882",
+      bg = Color3.fromRGB(8, 8, 10), gradA = Color3.fromRGB(28, 28, 34), gradB = Color3.fromRGB(8, 8, 10),
+      border = Color3.fromRGB(180, 180, 190), borderB = Color3.fromRGB(100, 100, 110),
+      namec = Color3.fromRGB(220, 220, 230), userc = Color3.fromRGB(140, 140, 155),
+      spark = {Color3.fromRGB(180,180,190), Color3.fromRGB(220,220,230), Color3.fromRGB(160,160,175)},
+    },
+    { name = "AK ADMIN", label = "Admin",
+      icon = "rbxassetid://6031094670",
+      bg = Color3.fromRGB(2, 6, 18), gradA = Color3.fromRGB(8, 22, 60), gradB = Color3.fromRGB(2, 6, 18),
+      border = Color3.fromRGB(70, 140, 255), borderB = Color3.fromRGB(30, 70, 200),
+      namec = Color3.fromRGB(170, 210, 255), userc = Color3.fromRGB(90, 150, 255),
+      spark = {Color3.fromRGB(70,140,255), Color3.fromRGB(120,180,255), Color3.fromRGB(160,210,255)},
+    },
+    { name = "AK VIP", label = "VIP",
+      icon = "rbxassetid://6034287594",
+      bg = Color3.fromRGB(12, 10, 2), gradA = Color3.fromRGB(50, 40, 5), gradB = Color3.fromRGB(12, 10, 2),
+      border = Color3.fromRGB(255, 215, 0), borderB = Color3.fromRGB(180, 140, 0),
+      namec = Color3.fromRGB(255, 240, 150), userc = Color3.fromRGB(210, 175, 40),
+      spark = {Color3.fromRGB(255,215,0), Color3.fromRGB(255,240,100), Color3.fromRGB(255,180,30)},
+    },
+    { name = "AK USER", label = "User",
+      icon = "rbxassetid://6034509993",
+      bg = Color3.fromRGB(2, 10, 6), gradA = Color3.fromRGB(8, 40, 22), gradB = Color3.fromRGB(2, 10, 6),
+      border = Color3.fromRGB(60, 200, 100), borderB = Color3.fromRGB(30, 130, 60),
+      namec = Color3.fromRGB(160, 240, 190), userc = Color3.fromRGB(80, 180, 120),
+      spark = {Color3.fromRGB(60,200,100), Color3.fromRGB(120,230,150), Color3.fromRGB(80,255,130)},
+    },
+    { name = "OWNER", label = "Owner",
+      icon = "rbxassetid://6031094670",
+      bg = Color3.fromRGB(12, 2, 2), gradA = Color3.fromRGB(50, 6, 6), gradB = Color3.fromRGB(12, 2, 2),
+      border = Color3.fromRGB(255, 55, 55), borderB = Color3.fromRGB(190, 15, 15),
+      namec = Color3.fromRGB(255, 120, 120), userc = Color3.fromRGB(220, 70, 70),
+      spark = {Color3.fromRGB(255,50,50), Color3.fromRGB(255,120,80), Color3.fromRGB(255,80,40)},
+      glitch = true,
+    },
+}
 
+-- Shared table for cross-client detection (same as PxTag pattern)
+if not shared.AKAdminUsers then shared.AKAdminUsers = {} end
+shared.AKAdminUsers[localPlayer.UserId] = true
+
+local currentTagPreset = nil
+local activeTags = {} -- userId -> { bb, hbConn, stars }
+local tagConns = {} -- connections to clean up
+
+local function cleanupTag(userId)
+    local t = activeTags[userId]
+    if t then
+        pcall(function() if t.hbConn then t.hbConn:Disconnect() end end)
+        pcall(function() if t.bb then t.bb:Destroy() end end)
+        activeTags[userId] = nil
+    end
+end
+
+local function buildTag(hrp, player, preset)
+    local userId = player.UserId
+    cleanupTag(userId)
+
+    local showName = preset.name
+    local showUser = "@" .. player.Name
+    local isOwner = preset.glitch
+    local WHITE = Color3.fromRGB(255, 255, 255)
+
+    -- Calculate width based on text
+    local iconSz = FULL_H - 10
+    local iconEnd = 3 + iconSz + 6
+    local nameW = math.ceil(#showName * 7.5) + iconEnd + 14
+    local userW = math.ceil(#showUser * 5.5) + iconEnd + 14
+    local baseWidth = math.max(math.min(math.max(nameW, userW), 260), iconEnd + 40)
+
+    -- BillboardGui on HumanoidRootPart
     local bb = Instance.new("BillboardGui")
     bb.Name = "AKTag"
-    bb.Size = UDim2.new(0, 160, 0, 50)
-    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.Size = UDim2.new(0, 0, 0, 0)
+    bb.StudsOffsetWorldSpace = BB_OFFSET
     bb.AlwaysOnTop = true
-    bb.Parent = head
+    bb.LightInfluence = 0
+    bb.ResetOnSpawn = false
+    bb.Parent = hrp
 
-    local tagFrame = createElement("Frame", {
-        Name = "TagFrame",
-        Size = UDim2.new(1, 0, 0, 36),
-        AnchorPoint = Vector2.new(0.5, 0.5),
-        Position = UDim2.new(0.5, 0, 0.5, 0),
-        BackgroundColor3 = preset.color,
-        BackgroundTransparency = 0.15,
-        BorderSizePixel = 0,
-        Parent = bb,
+    -- Main tag frame
+    local tf = Instance.new("Frame")
+    tf.Name = "TagFrame"
+    tf.Size = UDim2.new(1, 0, 0, FULL_H)
+    tf.BackgroundColor3 = WHITE
+    tf.BorderSizePixel = 0
+    tf.ClipsDescendants = true
+    tf.Parent = bb
+    addCorner(10, tf)
+
+    -- Background gradient
+    local bgGrad = Instance.new("UIGradient")
+    local sweepCol = lerpColor(preset.border, WHITE, 0.35)
+    bgGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, preset.gradB),
+        ColorSequenceKeypoint.new(0.3, lerpColor(preset.gradB, sweepCol, 0.04)),
+        ColorSequenceKeypoint.new(0.5, lerpColor(preset.gradB, sweepCol, 0.38)),
+        ColorSequenceKeypoint.new(0.7, lerpColor(preset.gradB, sweepCol, 0.04)),
+        ColorSequenceKeypoint.new(1, preset.gradB),
     })
-    addCorner(10, tagFrame)
+    bgGrad.Rotation = 45
+    bgGrad.Offset = Vector2.new(1, 0)
+    bgGrad.Parent = tf
 
-    createElement("ImageLabel", {
-        Size = UDim2.new(0, 18, 0, 18),
-        Position = UDim2.new(0, 8, 0, 4),
-        BackgroundTransparency = 1,
-        Image = preset.icon,
-        ImageColor3 = Theme.white,
-        ScaleType = Enum.ScaleType.Fit,
-        Parent = tagFrame,
+    -- Border stroke
+    local stroke = Instance.new("UIStroke")
+    stroke.Thickness = 2
+    stroke.Color = preset.border
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = tf
+
+    -- Avatar frame (circular)
+    local avFrame = Instance.new("Frame")
+    avFrame.Size = UDim2.new(0, iconSz, 0, iconSz)
+    avFrame.Position = UDim2.new(0, 3, 0.5, -(iconSz / 2))
+    avFrame.BackgroundColor3 = preset.bg
+    avFrame.BorderSizePixel = 0
+    avFrame.ZIndex = 3
+    avFrame.Parent = tf
+    Instance.new("UICorner", avFrame).CornerRadius = UDim.new(1, 0)
+
+    local avStroke = Instance.new("UIStroke")
+    avStroke.Thickness = 1.5
+    avStroke.Color = preset.border
+    avStroke.Transparency = 0.3
+    avStroke.Parent = avFrame
+
+    -- Avatar image (headshot)
+    local avImg = Instance.new("ImageLabel")
+    avImg.Size = UDim2.new(1, 0, 1, 0)
+    avImg.BackgroundTransparency = 1
+    avImg.ZIndex = 4
+    avImg.Image = string.format(HEADSHOT_URL, player.UserId)
+    avImg.Parent = avFrame
+    Instance.new("UICorner", avImg).CornerRadius = UDim.new(1, 0)
+
+    -- Name label with gradient
+    local nl = Instance.new("TextLabel")
+    nl.Size = UDim2.new(1, -(iconEnd + 4), 0, math.floor(FULL_H / 2))
+    nl.Position = UDim2.new(0, iconEnd, 0, 0)
+    nl.BackgroundTransparency = 1
+    nl.Font = Enum.Font.Code
+    nl.TextSize = 13
+    nl.TextXAlignment = Enum.TextXAlignment.Left
+    nl.TextYAlignment = Enum.TextYAlignment.Center
+    nl.TextStrokeTransparency = 0.85
+    nl.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    nl.ZIndex = 5
+    nl.TextColor3 = preset.namec
+    nl.Text = showName
+    nl.Parent = tf
+
+    local nlGrad = Instance.new("UIGradient")
+    local textMid = lerpColor(preset.namec, WHITE, 0.32)
+    nlGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, preset.namec),
+        ColorSequenceKeypoint.new(0.44, lerpColor(preset.namec, textMid, 0.5)),
+        ColorSequenceKeypoint.new(0.5, textMid),
+        ColorSequenceKeypoint.new(0.56, lerpColor(preset.namec, textMid, 0.5)),
+        ColorSequenceKeypoint.new(1, preset.namec),
     })
+    nlGrad.Rotation = 45
+    nlGrad.Offset = Vector2.new(1, 0)
+    nlGrad.Parent = nl
 
-    createElement("TextLabel", {
-        Size = UDim2.new(1, -32, 0, 16),
-        Position = UDim2.new(0, 30, 0, 3),
-        BackgroundTransparency = 1,
-        Text = preset.name,
-        TextColor3 = Theme.white,
-        TextSize = 13,
-        Font = Enum.Font.GothamBold,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = tagFrame,
+    -- Username label
+    local ul = Instance.new("TextLabel")
+    ul.Size = UDim2.new(1, -(iconEnd + 4), 0, math.floor(FULL_H / 2))
+    ul.Position = UDim2.new(0, iconEnd, 0, math.floor(FULL_H / 2))
+    ul.BackgroundTransparency = 1
+    ul.Font = Enum.Font.Code
+    ul.TextSize = 9
+    ul.TextXAlignment = Enum.TextXAlignment.Left
+    ul.TextYAlignment = Enum.TextYAlignment.Center
+    ul.TextStrokeTransparency = 0.7
+    ul.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    ul.ZIndex = 5
+    ul.TextColor3 = preset.userc
+    ul.Text = showUser
+    ul.Parent = tf
+
+    local ulGrad = Instance.new("UIGradient")
+    local userMid = lerpColor(preset.userc, WHITE, 0.28)
+    ulGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, preset.userc),
+        ColorSequenceKeypoint.new(0.44, lerpColor(preset.userc, userMid, 0.5)),
+        ColorSequenceKeypoint.new(0.5, userMid),
+        ColorSequenceKeypoint.new(0.56, lerpColor(preset.userc, userMid, 0.5)),
+        ColorSequenceKeypoint.new(1, preset.userc),
     })
+    ulGrad.Rotation = 45
+    ulGrad.Offset = Vector2.new(1, 0)
+    ulGrad.Parent = ul
 
-    createElement("TextLabel", {
-        Size = UDim2.new(1, -32, 0, 12),
-        Position = UDim2.new(0, 30, 0, 19),
-        BackgroundTransparency = 1,
-        Text = "@" .. playerName,
-        TextColor3 = Color3.fromRGB(200, 200, 205),
-        TextSize = 10,
-        Font = Enum.Font.Gotham,
-        TextXAlignment = Enum.TextXAlignment.Left,
-        Parent = tagFrame,
-    })
+    -- Sparkle particles
+    local stars = {}
+    local sparkCount = isOwner and 18 or 12
+    for i = 1, sparkCount do
+        local ci = math.random(1, #preset.spark)
+        local roll = math.random()
+        local sym = roll < 0.55 and "\194\183" or roll < 0.85 and "\226\156\166" or "\226\152\133"
+        local sz = math.random(9, 14)
+        local star = Instance.new("TextLabel")
+        star.BackgroundTransparency = 1
+        star.Font = Enum.Font.Code
+        star.TextSize = sz
+        star.TextColor3 = preset.spark[ci]
+        star.Text = sym
+        star.TextXAlignment = Enum.TextXAlignment.Center
+        star.TextYAlignment = Enum.TextYAlignment.Center
+        star.Size = UDim2.new(0, sz + 4, 0, sz + 4)
+        star.AnchorPoint = Vector2.new(0.5, 0.5)
+        star.BorderSizePixel = 0
+        star.ZIndex = 2
+        star.TextTransparency = 1
+        local rx = math.random(5, 95) / 100
+        local ry = math.random(10, 90) / 100
+        star.Position = UDim2.new(rx, 0, ry, 0)
+        star.Parent = tf
+        table.insert(stars, {
+            L = star, bx = rx, by = ry, baseSize = sz,
+            phase = math.random() * math.pi * 2,
+            speed = 0.08 + math.random() * 0.18,
+            driftX = (math.random() - 0.5) * 0.01,
+            alpha = 0, life = math.random() * 2.5,
+            maxLife = 1.5 + math.random() * 2.0,
+            col = preset.spark[ci],
+        })
+    end
 
+    -- Shine sweep frame (owners only)
+    local shine = nil
+    if isOwner then
+        shine = Instance.new("Frame")
+        shine.Name = "Shine"
+        shine.Size = UDim2.new(0, 60, 1.6, 0)
+        shine.Position = UDim2.new(-0.45, 0, -0.3, 0)
+        shine.BackgroundColor3 = WHITE
+        shine.BackgroundTransparency = 1
+        shine.BorderSizePixel = 0
+        shine.ZIndex = 8
+        shine.Rotation = 22
+        shine.Parent = bb
+        local shGrad = Instance.new("UIGradient")
+        shGrad.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.4, 0.38),
+            NumberSequenceKeypoint.new(0.6, 0.38),
+            NumberSequenceKeypoint.new(1, 1),
+        })
+        shGrad.Rotation = 90
+        shGrad.Parent = shine
+    end
+
+    -- Per-frame animation
+    local sweepT = math.random()
+    local sweepSpeed = 0.18
+    local shineTimer = 0
+    local nextShine = math.random(4, 8)
+    local glitchTimer, glitchOn = 0, false
+    local nextGlitch = math.random(3, 6)
+
+    local lerpT = 1
+    local hbConn
+    hbConn = RunService.Heartbeat:Connect(function(dt)
+        if not tf or not tf.Parent then
+            if hbConn then hbConn:Disconnect() end
+            return
+        end
+
+        -- Distance-based scaling
+        local myHRP = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local dist = myHRP and hrp.Parent and (myHRP.Position - hrp.Position).Magnitude or 0
+
+        local targetT = dist < FULL_DIST and 1 or dist >= SHRINK_START and 0 or
+            1 - (dist - FULL_DIST) / (SHRINK_START - FULL_DIST)
+        lerpT = lerpN(lerpT, targetT, math.min(1, dt * 10))
+
+        local curW = math.floor(lerpN(MINI_W, baseWidth, lerpT))
+        local curH = math.floor(lerpN(MINI_H, FULL_H, lerpT))
+        bb.Size = UDim2.new(0, curW, 0, curH)
+
+        -- Show/hide text based on lerp
+        nl.TextTransparency = 1 - lerpT
+        ul.TextTransparency = 1 - lerpT
+
+        -- Gradient sweep animation
+        sweepT = sweepT + dt * sweepSpeed
+        if sweepT > 2 then sweepT = sweepT - 2 end
+        local offset = sweepT < 1 and (1 - sweepT * 2) or (-1 + (sweepT - 1) * 2)
+        bgGrad.Offset = Vector2.new(offset, 0)
+        nlGrad.Offset = Vector2.new(offset, 0)
+        ulGrad.Offset = Vector2.new(offset, 0)
+
+        -- Sparkle animation
+        for _, s in ipairs(stars) do
+            s.life = s.life + dt
+            if s.life > s.maxLife then
+                s.life = 0
+                s.bx = math.random(5, 95) / 100
+                s.by = math.random(10, 90) / 100
+                s.alpha = 0
+            end
+            local frac = s.life / s.maxLife
+            local a = frac < 0.2 and (frac / 0.2) or frac > 0.7 and (1 - (frac - 0.7) / 0.3) or 1
+            s.alpha = a * lerpT
+            s.L.TextTransparency = 1 - s.alpha * 0.6
+            s.bx = s.bx + s.driftX * dt
+            s.by = s.by - s.speed * dt
+            if s.by < -0.1 then s.by = 1.1; s.bx = math.random(5, 95) / 100 end
+            s.L.Position = UDim2.new(s.bx, 0, s.by, 0)
+        end
+
+        -- Shine (owner only)
+        if shine then
+            shineTimer = shineTimer + dt
+            if shineTimer >= nextShine then
+                shineTimer = 0
+                nextShine = math.random(4, 8)
+                shine.Position = UDim2.new(-0.45, 0, -0.3, 0)
+                TweenService:Create(shine, TweenInfo.new(0.7, Enum.EasingStyle.Quad), {
+                    Position = UDim2.new(1.45, 0, -0.3, 0)
+                }):Play()
+            end
+        end
+
+        -- Glitch (owner only)
+        if isOwner then
+            glitchTimer = glitchTimer + dt
+            if glitchOn then
+                if glitchTimer > 0.08 then
+                    glitchOn = false
+                    glitchTimer = 0
+                    nextGlitch = math.random(3, 6)
+                    nl.TextColor3 = preset.namec
+                    stroke.Color = preset.border
+                end
+            else
+                if glitchTimer > nextGlitch then
+                    glitchOn = true
+                    glitchTimer = 0
+                    nl.TextColor3 = preset.borderB
+                    stroke.Color = preset.borderB
+                end
+            end
+        end
+    end)
+
+    activeTags[userId] = { bb = bb, hbConn = hbConn, stars = stars, presetIdx = nil }
     return bb
 end
 
-local function applyTag(preset, broadcast)
-    removeTag()
+local function removeTag()
+    cleanupTag(localPlayer.UserId)
+    currentTagPreset = nil
+    pcall(function()
+        local char = localPlayer.Character
+        if char then char:SetAttribute(AK_TAG_ATTR, 0) end
+    end)
+end
 
+local function applyTag(preset)
+    removeTag()
     local char = localPlayer.Character
     if not char then return end
-    local head = char:FindFirstChild("Head")
-    if not head then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
 
-    currentTag = applyTagToHead(head, preset, localPlayer.Name)
+    buildTag(hrp, localPlayer, preset)
     currentTagPreset = preset
 
-    -- Broadcast to other AK Admin users via chat
-    if broadcast ~= false then
-        local tagIndex = 0
-        for i, p in ipairs(TAG_PRESETS) do
-            if p.name == preset.name then
-                tagIndex = i
-                break
-            end
-        end
-        if tagIndex > 0 then
-            pcall(function()
-                local textChatService = getService("TextChatService")
-                local channels = textChatService:FindFirstChild("TextChannels")
-                if channels then
-                    local general = channels:FindFirstChild("RBXGeneral")
-                    if general then
-                        general:SendAsync(TAG_SIGNAL_PREFIX .. tostring(tagIndex))
-                    end
-                end
-            end)
-        end
+    local tagIndex = 0
+    for i, p in ipairs(TAG_PRESETS) do
+        if p.name == preset.name then tagIndex = i; break end
+    end
+    pcall(function() char:SetAttribute(AK_TAG_ATTR, tagIndex) end)
+    -- Store for respawn
+    if activeTags[localPlayer.UserId] then
+        activeTags[localPlayer.UserId].presetIdx = tagIndex
     end
 end
 
--- Apply a remote player's tag (called when we receive their signal)
+-- Apply remote player's tag
 local function applyRemoteTag(player, presetIndex)
-    -- Remove existing remote tag for this player
-    if remoteTags[player.UserId] then
-        pcall(function() remoteTags[player.UserId]:Destroy() end)
-        remoteTags[player.UserId] = nil
-    end
-
-    if presetIndex == 0 then return end -- they removed their tag
-
+    cleanupTag(player.UserId)
+    if presetIndex == 0 or not presetIndex then return end
     local preset = TAG_PRESETS[presetIndex]
     if not preset then return end
-
     local char = player.Character
     if not char then return end
-    local head = char:FindFirstChild("Head")
-    if not head then return end
-
-    remoteTags[player.UserId] = applyTagToHead(head, preset, player.Name)
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    buildTag(hrp, player, preset)
+    if activeTags[player.UserId] then
+        activeTags[player.UserId].presetIdx = presetIndex
+    end
 end
 
--- Re-apply own tag when character respawns
-localPlayer.CharacterAdded:Connect(function(char)
-    if currentTagPreset then
-        local savedPreset = currentTagPreset
-        task.wait(0.5)
-        local head = char:WaitForChild("Head", 5)
-        if head then
-            currentTag = applyTagToHead(head, savedPreset, localPlayer.Name)
-            currentTagPreset = savedPreset
-        end
-    end
-end)
+-- Cross-client detection: watch for attribute + animation signal
+local function watchPlayer(player)
+    if player == localPlayer then return end
 
--- Re-apply remote tags when other players respawn
-Players.PlayerAdded:Connect(function(player)
-    player.CharacterAdded:Connect(function(char)
-        -- If we had a tag stored for this player, re-apply it
-        if remoteTags[player.UserId] then
-            local presetIndex = nil
-            pcall(function()
-                local tf = remoteTags[player.UserId]:FindFirstChild("TagFrame")
-                if tf then
-                    local tl = tf:FindFirstChildWhichIsA("TextLabel")
-                    if tl then
-                        for i, p in ipairs(TAG_PRESETS) do
-                            if p.name == tl.Text then
-                                presetIndex = i
-                                break
-                            end
+    local function onChar(char)
+        task.wait(0.3)
+        -- Check attribute
+        local idx = char:GetAttribute(AK_TAG_ATTR)
+        if idx and idx > 0 then
+            applyRemoteTag(player, idx)
+        end
+        char:GetAttributeChangedSignal(AK_TAG_ATTR):Connect(function()
+            applyRemoteTag(player, char:GetAttribute(AK_TAG_ATTR) or 0)
+        end)
+
+        -- Check animation signal (like PxTag)
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.AnimationPlayed:Connect(function(track)
+                if track and track.Animation and track.Animation.AnimationId == AK_ANIM_ID then
+                    if math.abs(track.Speed - AK_ANIM_SPEED) < 0.05 then
+                        shared.AKAdminUsers[player.UserId] = true
+                        -- Apply default "client" tag if they don't have one yet
+                        if not activeTags[player.UserId] then
+                            applyRemoteTag(player, 4) -- AK USER
                         end
                     end
                 end
             end)
-            if presetIndex then
-                task.wait(0.5)
-                applyRemoteTag(player, presetIndex)
+        end
+    end
+
+    if player.Character then task.spawn(onChar, player.Character) end
+    player.CharacterAdded:Connect(function(c) task.spawn(onChar, c) end)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do watchPlayer(p) end
+Players.PlayerAdded:Connect(watchPlayer)
+
+-- Own respawn
+localPlayer.CharacterAdded:Connect(function(char)
+    if currentTagPreset then
+        local saved = currentTagPreset
+        task.wait(0.5)
+        local hrp = char:WaitForChild("HumanoidRootPart", 5)
+        if hrp then
+            buildTag(hrp, localPlayer, saved)
+            currentTagPreset = saved
+            local idx = 0
+            for i, p in ipairs(TAG_PRESETS) do
+                if p.name == saved.name then idx = i; break end
             end
+            pcall(function() char:SetAttribute(AK_TAG_ATTR, idx) end)
+            if activeTags[localPlayer.UserId] then
+                activeTags[localPlayer.UserId].presetIdx = idx
+            end
+        end
+    end
+    -- Re-play signal animation
+    pcall(function()
+        local hum = char:WaitForChild("Humanoid", 5)
+        if hum then
+            local anim = Instance.new("Animation")
+            anim.AnimationId = AK_ANIM_ID
+            local track = hum:LoadAnimation(anim)
+            track:Play()
+            track:AdjustSpeed(AK_ANIM_SPEED)
         end
     end)
 end)
 
--- Also hook existing players' CharacterAdded
-for _, player in ipairs(Players:GetPlayers()) do
-    if player ~= localPlayer then
-        player.CharacterAdded:Connect(function()
-            if remoteTags[player.UserId] then
-                local presetIndex = nil
-                pcall(function()
-                    local tf = remoteTags[player.UserId]:FindFirstChild("TagFrame")
-                    if tf then
-                        local tl = tf:FindFirstChildWhichIsA("TextLabel")
-                        if tl then
-                            for i, p in ipairs(TAG_PRESETS) do
-                                if p.name == tl.Text then
-                                    presetIndex = i
-                                    break
-                                end
-                            end
-                        end
-                    end
-                end)
-                if presetIndex then
-                    task.wait(0.5)
-                    applyRemoteTag(player, presetIndex)
-                end
-            end
-        end)
-    end
-end
-
--- Clean up remote tags when players leave
+-- Remote tag respawn
 Players.PlayerRemoving:Connect(function(player)
-    if remoteTags[player.UserId] then
-        pcall(function() remoteTags[player.UserId]:Destroy() end)
-        remoteTags[player.UserId] = nil
-    end
+    cleanupTag(player.UserId)
+    if shared.AKAdminUsers then shared.AKAdminUsers[player.UserId] = nil end
 end)
 
--- Broadcast own tag on join (so new AK users see existing tags)
-task.delay(3, function()
-    if currentTagPreset then
-        local tagIndex = 0
-        for i, p in ipairs(TAG_PRESETS) do
-            if p.name == currentTagPreset.name then
-                tagIndex = i
-                break
-            end
+-- Play signal animation on startup
+task.spawn(function()
+    local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    task.wait(1)
+    pcall(function()
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local anim = Instance.new("Animation")
+            anim.AnimationId = AK_ANIM_ID
+            local track = hum:LoadAnimation(anim)
+            track:Play()
+            track:AdjustSpeed(AK_ANIM_SPEED)
         end
-        if tagIndex > 0 then
-            pcall(function()
-                local textChatService = getService("TextChatService")
-                local channels = textChatService:FindFirstChild("TextChannels")
-                if channels then
-                    local general = channels:FindFirstChild("RBXGeneral")
-                    if general then
-                        general:SendAsync(TAG_SIGNAL_PREFIX .. tostring(tagIndex))
-                    end
-                end
-            end)
-        end
-    end
+    end)
 end)
 
 ------------------------------------------------------------
@@ -1036,7 +1297,7 @@ for i, preset in ipairs(TAG_PRESETS) do
     end)
     tagEntry.MouseButton1Click:Connect(function()
         playSfx(sfxClick)
-        applyTag(preset, true)
+        applyTag(preset)
         showNotification("AK ADMIN", "Tag set: " .. preset.name, 2)
         -- close dropdown
         tagDropOpen = false
@@ -1080,17 +1341,6 @@ end)
 removeEntry.MouseButton1Click:Connect(function()
     playSfx(sfxClick)
     removeTag()
-    -- Broadcast removal
-    pcall(function()
-        local textChatService = getService("TextChatService")
-        local channels = textChatService:FindFirstChild("TextChannels")
-        if channels then
-            local general = channels:FindFirstChild("RBXGeneral")
-            if general then
-                general:SendAsync(TAG_SIGNAL_PREFIX .. "0")
-            end
-        end
-    end)
     showNotification("AK ADMIN", "Tag removed", 2)
     tagDropOpen = false
     playTween(tagDropdown, Tweens.slide, { Size = UDim2.new(0, 160, 0, 0) })
@@ -1152,6 +1402,9 @@ minimizeBtn.MouseButton1Click:Connect(function()
     playSfx(sfxClick)
     isMinimized = not isMinimized
     if isMinimized then
+        searchContainer.Visible = false
+        cmdScroll.Visible = false
+        cmdInputBar.Visible = false
         playTween(mainFrame, Tweens.slide, {
             Size = UDim2.new(0, WIN_W, 0, TITLE_H + 4),
         })
@@ -1160,6 +1413,11 @@ minimizeBtn.MouseButton1Click:Connect(function()
         playTween(mainFrame, Tweens.slide, {
             Size = UDim2.new(0, WIN_W, 0, WIN_H),
         })
+        task.delay(0.15, function()
+            searchContainer.Visible = true
+            cmdScroll.Visible = true
+            cmdInputBar.Visible = true
+        end)
         minimizeBtn.Text = "-"
     end
 end)
@@ -1449,7 +1707,7 @@ cmdInput.FocusLost:Connect(function(enterPressed)
 end)
 
 ------------------------------------------------------------
--- CHAT COMMAND HOOK (! prefix in chat) + TAG SIGNAL LISTENER
+-- CHAT COMMAND HOOK (! prefix in chat)
 ------------------------------------------------------------
 pcall(function()
     local textChatService = getService("TextChatService")
@@ -1457,7 +1715,6 @@ pcall(function()
     if channels then
         local general = channels:FindFirstChild("RBXGeneral")
         if general then
-            -- Local commands (own messages)
             general:ConnectLocal(function(msg)
                 if msg and msg.Text then
                     local text = msg.Text
@@ -1465,39 +1722,6 @@ pcall(function()
                         executeCommand(text)
                     end
                 end
-            end)
-
-            -- Listen for ALL messages (including from other players)
-            -- to detect tag signals from other AK Admin users
-            general.MessageReceived:Connect(function(msg)
-                pcall(function()
-                    if not msg or not msg.Text then return end
-                    local text = msg.Text
-
-                    -- Check if this is a tag signal
-                    if string.sub(text, 1, #TAG_SIGNAL_PREFIX) == TAG_SIGNAL_PREFIX then
-                        local tagIndexStr = string.sub(text, #TAG_SIGNAL_PREFIX + 1)
-                        local tagIndex = tonumber(tagIndexStr)
-                        if tagIndex == nil then return end
-
-                        -- Find which player sent this message
-                        local sender = nil
-                        if msg.TextSource then
-                            local senderId = msg.TextSource.UserId
-                            if senderId == localPlayer.UserId then return end -- ignore own
-                            sender = Players:GetPlayerByUserId(senderId)
-                        end
-
-                        if sender then
-                            applyRemoteTag(sender, tagIndex)
-                            if tagIndex > 0 and TAG_PRESETS[tagIndex] then
-                                print("[AK Admin] " .. sender.Name .. " equipped tag: " .. TAG_PRESETS[tagIndex].name)
-                            else
-                                print("[AK Admin] " .. sender.Name .. " removed their tag")
-                            end
-                        end
-                    end
-                end)
             end)
         end
     end
@@ -1645,13 +1869,122 @@ task.spawn(function()
         showNotification("AK ADMIN", "No commands loaded. Check console.", 5)
     end
 
-    -- Also try loading extended baseplate prompt
+    -- Inline baseplate extend prompt (replaces remote ib2.dev version)
     pcall(function()
-        local bpSource = game:HttpGet(BASEPLATE_URL)
-        if bpSource and bpSource ~= "" then
-            local bpFn = loadstring(bpSource)
-            if bpFn then bpFn() end
+        if _G.bp then return end
+        _G.bp = true
+
+        local bpGui = createElement("ScreenGui", {
+            Name = "BaseplatePrompt",
+            ResetOnSpawn = false,
+            IgnoreGuiInset = true,
+            Parent = CoreGui,
+        })
+
+        local bpFrame = createElement("Frame", {
+            Size = UDim2.new(0, 320, 0, 90),
+            Position = UDim2.new(0, 20, 1, 20),
+            BackgroundColor3 = Theme.bg,
+            BackgroundTransparency = 0.15,
+            BorderSizePixel = 0,
+            Parent = bpGui,
+        })
+        addCorner(12, bpFrame)
+        addStroke(Theme.border, 0.3, bpFrame)
+
+        createElement("TextLabel", {
+            Size = UDim2.new(1, -10, 0, 18),
+            Position = UDim2.new(0, 5, 0, 5),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.GothamBold,
+            TextSize = 10,
+            TextColor3 = Theme.txtFaint,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            Text = "AK ADMIN",
+            Parent = bpFrame,
+        })
+
+        createElement("TextLabel", {
+            Size = UDim2.new(1, -20, 0, 30),
+            Position = UDim2.new(0, 10, 0, 25),
+            BackgroundTransparency = 1,
+            Font = Enum.Font.Gotham,
+            TextSize = 13,
+            TextColor3 = Theme.txt,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextWrapped = true,
+            Text = "Would you like to extend the baseplate?",
+            Parent = bpFrame,
+        })
+
+        local btnContainer = createElement("Frame", {
+            Size = UDim2.new(1, -20, 0, 22),
+            Position = UDim2.new(0, 10, 1, -30),
+            BackgroundTransparency = 1,
+            Parent = bpFrame,
+        })
+        addListLayout(Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Right, Enum.VerticalAlignment.Center, 8, btnContainer)
+
+        -- Yes button FIRST (left side)
+        local yesBtn = createElement("TextButton", {
+            Size = UDim2.new(0, 60, 0, 22),
+            BackgroundColor3 = Theme.green,
+            BackgroundTransparency = 0.3,
+            BorderSizePixel = 0,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            TextColor3 = Theme.white,
+            Text = "Yes",
+            AutoButtonColor = false,
+            LayoutOrder = 1,
+            Parent = btnContainer,
+        })
+        addCorner(6, yesBtn)
+
+        -- No button SECOND (right side)
+        local noBtn = createElement("TextButton", {
+            Size = UDim2.new(0, 60, 0, 22),
+            BackgroundColor3 = Theme.bgDark,
+            BackgroundTransparency = 0.3,
+            BorderSizePixel = 0,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            TextColor3 = Theme.txt,
+            Text = "No",
+            AutoButtonColor = false,
+            LayoutOrder = 2,
+            Parent = btnContainer,
+        })
+        addCorner(6, noBtn)
+
+        -- Slide in
+        playTween(bpFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0, 20, 1, -110),
+        })
+
+        local function closeBp()
+            local out = playTween(bpFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+                Position = UDim2.new(0, 20, 1, 20),
+            })
+            out.Completed:Wait()
+            bpGui:Destroy()
         end
+
+        yesBtn.MouseButton1Click:Connect(function()
+            for _, d in ipairs(workspace:GetDescendants()) do
+                if d.Name == "Baseplate" and d:IsA("BasePart") then
+                    local y = d.Size.Y
+                    local bg = math.max(d.Size.X, d.Size.Z)
+                    d.Size = Vector3.new(math.max(bg * 1e9, 1e12), y, math.max(bg * 1e9, 1e12))
+                    break
+                end
+            end
+            closeBp()
+        end)
+
+        noBtn.MouseButton1Click:Connect(function()
+            closeBp()
+        end)
     end)
 end)
 
