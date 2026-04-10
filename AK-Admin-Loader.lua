@@ -714,7 +714,7 @@ local FULL_W, FULL_H = 200, 42
 local MINI_W, MINI_H = 50, 50
 local FULL_DIST, SHRINK_START = 30, 55
 local BB_OFFSET = Vector3.new(0, 3.2, 0)
-local AK_ANIM_ID = "rbxassetid://182393478"
+local AK_ANIM_ID = nil -- disabled: visible arm glitch
 local AK_ANIM_SPEED = 1.42
 local AK_TAG_ATTR = "AKTagIdx"
 
@@ -1181,17 +1181,7 @@ localPlayer.CharacterAdded:Connect(function(char)
             end
         end
     end
-    -- Re-play signal animation
-    pcall(function()
-        local hum = char:WaitForChild("Humanoid", 5)
-        if hum then
-            local anim = Instance.new("Animation")
-            anim.AnimationId = AK_ANIM_ID
-            local track = hum:LoadAnimation(anim)
-            track:Play()
-            track:AdjustSpeed(AK_ANIM_SPEED)
-        end
-    end)
+    -- (animation signal disabled — uses attribute-only detection)
 end)
 
 -- Remote tag respawn
@@ -1200,21 +1190,7 @@ Players.PlayerRemoving:Connect(function(player)
     if shared.AKAdminUsers then shared.AKAdminUsers[player.UserId] = nil end
 end)
 
--- Play signal animation on startup
-task.spawn(function()
-    local char = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-    task.wait(1)
-    pcall(function()
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            local anim = Instance.new("Animation")
-            anim.AnimationId = AK_ANIM_ID
-            local track = hum:LoadAnimation(anim)
-            track:Play()
-            track:AdjustSpeed(AK_ANIM_SPEED)
-        end
-    end)
-end)
+-- (animation signal removed — attribute-only cross-client detection)
 
 ------------------------------------------------------------
 -- TAG SELECTOR DROPDOWN (opens from bird icon)
