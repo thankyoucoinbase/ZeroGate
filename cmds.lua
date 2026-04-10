@@ -40,9 +40,10 @@ return (function(descendants, serverTime, hash)
     end
 
     local function splitArgs(str)
+        if type(str) == "table" then return str end
         local args = {}
-        if not str then return args end
-        for word in string.gmatch(str, "%S+") do
+        if not str or str == "" then return args end
+        for word in string.gmatch(tostring(str), "%S+") do
             table.insert(args, word)
         end
         return args
