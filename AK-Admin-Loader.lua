@@ -531,10 +531,10 @@ addListLayout(
     Enum.FillDirection.Vertical,
     Enum.HorizontalAlignment.Center,
     nil,
-    4,
+    3,
     cmdScroll
 )
-addPadding(2, 2, 2, 2, cmdScroll)
+addPadding(3, 3, 3, 3, cmdScroll)
 
 ------------------------------------------------------------
 -- TOP-RIGHT STATUS BAR
@@ -1138,21 +1138,7 @@ local function watchPlayer(player)
             applyRemoteTag(player, char:GetAttribute(AK_TAG_ATTR) or 0)
         end)
 
-        -- Check animation signal (like PxTag)
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.AnimationPlayed:Connect(function(track)
-                if track and track.Animation and track.Animation.AnimationId == AK_ANIM_ID then
-                    if math.abs(track.Speed - AK_ANIM_SPEED) < 0.05 then
-                        shared.AKAdminUsers[player.UserId] = true
-                        -- Apply default "client" tag if they don't have one yet
-                        if not activeTags[player.UserId] then
-                            applyRemoteTag(player, 4) -- AK USER
-                        end
-                    end
-                end
-            end)
-        end
+        -- (animation signal removed — attribute-only cross-client detection)
     end
 
     if player.Character then task.spawn(onChar, player.Character) end
@@ -1427,13 +1413,33 @@ end)
 ------------------------------------------------------------
 searchInput:GetPropertyChangedSignal("Text"):Connect(function()
     local query = string.lower(searchInput.Text)
+    local catHasVisible = {}
+
+    -- First pass: show/hide command entries
     for _, child in ipairs(cmdScroll:GetChildren()) do
-        if child:IsA("Frame") then
-            if query == "" then
-                child.Visible = true
-            else
-                child.Visible = string.find(string.lower(child.Name), query, 1, true) ~= nil
+        if child:IsA("Frame") and child.Name ~= "" then
+            local n = child.Name
+            if string.sub(n, 1, 4) ~= "CAT_" then
+                if query == "" then
+                    child.Visible = true
+                    local cat = _G._AK_CMD_CATS and _G._AK_CMD_CATS[n]
+                    if cat then catHasVisible["CAT_" .. cat] = true end
+                else
+                    local vis = string.find(string.lower(n), query, 1, true) ~= nil
+                    child.Visible = vis
+                    if vis then
+                        local cat = _G._AK_CMD_CATS and _G._AK_CMD_CATS[n]
+                        if cat then catHasVisible["CAT_" .. cat] = true end
+                    end
+                end
             end
+        end
+    end
+
+    -- Second pass: show/hide category headers
+    for _, child in ipairs(cmdScroll:GetChildren()) do
+        if child:IsA("Frame") and string.sub(child.Name, 1, 4) == "CAT_" then
+            child.Visible = (query == "") or (catHasVisible[child.Name] == true)
         end
     end
 end)
@@ -1539,43 +1545,177 @@ local function showNotification(title, body, duration)
 end
 
 ------------------------------------------------------------
--- COMMAND ENTRY BUILDER (populate scroll list)
+-- COMMAND CATEGORY SYSTEM (PxTag-style organized layout)
 ------------------------------------------------------------
-local function buildCmdEntry(name, description)
-    local entry = createElement("Frame", {
-        Name = name,
-        Size = UDim2.new(1, 0, 0, 36),
-        BackgroundColor3 = Theme.surface,
-        BackgroundTransparency = Theme.surfaceT,
+local CAT_COLORS = {
+    Teleport   = Color3.fromRGB(80, 220, 120),
+    Combat     = Color3.fromRGB(220, 70, 70),
+    Movement   = Color3.fromRGB(80, 160, 255),
+    Character  = Color3.fromRGB(180, 100, 255),
+    Animation  = Color3.fromRGB(255, 180, 50),
+    Social     = Color3.fromRGB(255, 100, 180),
+    Protection = Color3.fromRGB(50, 200, 200),
+    Utility    = Color3.fromRGB(220, 185, 50),
+    Server     = Color3.fromRGB(160, 160, 175),
+    Other      = Color3.fromRGB(120, 140, 170),
+}
+
+local CAT_ORDER = {
+    "Teleport", "Combat", "Movement", "Character",
+    "Animation", "Social", "Protection", "Utility", "Server", "Other",
+}
+
+local CMD_CATEGORIES = {
+    bring = "Teleport", call = "Teleport", gokutp = "Teleport",
+    ftap = "Teleport", ftp = "Teleport", tprj = "Teleport", colbring = "Teleport",
+
+    fling = "Combat", touchfling = "Combat", uafling = "Combat",
+    dropkick = "Combat", trip = "Combat", flip = "Combat", ball = "Combat",
+    domainexpansion = "Combat", aimlock = "Combat", swordreach = "Combat",
+
+    stalk = "Movement", speed = "Movement", sfly = "Movement",
+    walkonair = "Movement", reverse = "Movement",
+
+    re = "Character", voidre = "Character", invis = "Character",
+    reanim = "Character", changetor15 = "Character", changetor6 = "Character",
+
+    animcopy = "Animation", animlogger = "Animation", animrecorder = "Animation",
+    caranimations = "Animation", emotes = "Animation", ugcemotes = "Animation",
+
+    hug = "Social", jerk = "Social", kidnap = "Social",
+    limborbit = "Social", facebang = "Social", facebangweld = "Social",
+
+    antiafk = "Protection", antifling = "Protection", antisit = "Protection",
+    antislide = "Protection", antivcban = "Protection", antivoid = "Protection",
+    antiall = "Protection", antiaim = "Protection", antikidnap = "Protection",
+
+    admincheck = "Utility", chatlogs = "Utility", chatcolorchanger = "Utility",
+    rizzlines = "Utility", spotify = "Utility", skymaster = "Utility",
+    shaders = "Utility", pinghop = "Utility", positionsaver = "Utility",
+    mobileshiftlock = "Utility", infbaseplate = "Utility", autoclick = "Utility",
+    esp = "Utility", godmode = "Utility",
+
+    naturaldisastergodmode = "Server", aitools = "Server", ad = "Server",
+    shlowest = "Server", shmost = "Server", ownercmdbar = "Server", iy = "Server",
+}
+
+-- Expose for search filter
+_G._AK_CMD_CATS = CMD_CATEGORIES
+
+local catLayoutOrder = 0
+
+------------------------------------------------------------
+-- CATEGORY HEADER BUILDER
+------------------------------------------------------------
+local function buildCatHeader(title, accentColor)
+    catLayoutOrder = catLayoutOrder + 1
+    local header = createElement("Frame", {
+        Name = "CAT_" .. title,
+        Size = UDim2.new(1, 0, 0, 24),
+        BackgroundColor3 = accentColor,
+        BackgroundTransparency = 0.88,
         BorderSizePixel = 0,
+        LayoutOrder = catLayoutOrder,
         Parent = cmdScroll,
     })
-    addCorner(8, entry)
-    addStroke(Theme.borderDim, 0.6, entry)
+    addCorner(5, header)
 
-    -- Command name
-    local cmdLabel = createElement("TextLabel", {
-        Size = UDim2.new(1, -16, 0, 18),
-        Position = UDim2.new(0, 10, 0, description and 4 or 9),
+    -- Accent bar on left
+    local bar = createElement("Frame", {
+        Size = UDim2.new(0, 3, 0, 14),
+        Position = UDim2.new(0, 4, 0.5, -7),
+        BackgroundColor3 = accentColor,
+        BorderSizePixel = 0,
+        Parent = header,
+    })
+    addCorner(2, bar)
+
+    createElement("TextLabel", {
+        Size = UDim2.new(1, -18, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
         BackgroundTransparency = 1,
-        Text = "!" .. name,
+        Text = string.upper(title),
+        TextColor3 = accentColor,
+        TextSize = 10,
+        Font = Enum.Font.Code,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = header,
+    })
+
+    return header
+end
+
+------------------------------------------------------------
+-- COMMAND ENTRY BUILDER (PxTag-style rows)
+------------------------------------------------------------
+local function buildCmdEntry(name, description, accentColor)
+    catLayoutOrder = catLayoutOrder + 1
+    accentColor = accentColor or Theme.accent
+
+    -- Parse desc format: "cmdname [args] - description text"
+    local cmdSyntax = "!" .. name
+    local cleanDesc = description or ""
+    if description and description ~= "" then
+        local before, after = description:match("^(.-)%s*%-%s*(.+)$")
+        if before and after then
+            local args = before:match("^%S+%s+(.+)$")
+            if args then
+                cmdSyntax = "!" .. name .. " " .. args
+            end
+            cleanDesc = after
+        end
+    end
+
+    local hasDesc = cleanDesc ~= ""
+    local entryH = hasDesc and 36 or 28
+
+    local entry = createElement("Frame", {
+        Name = name,
+        Size = UDim2.new(1, 0, 0, entryH),
+        BackgroundColor3 = Theme.bgDark,
+        BackgroundTransparency = 0.2,
+        BorderSizePixel = 0,
+        LayoutOrder = catLayoutOrder,
+        ClipsDescendants = true,
+        Parent = cmdScroll,
+    })
+    addCorner(5, entry)
+
+    -- Left accent bar
+    local accentBar = createElement("Frame", {
+        Name = "Accent",
+        Size = UDim2.new(0, 3, 1, -8),
+        Position = UDim2.new(0, 0, 0, 4),
+        BackgroundColor3 = accentColor,
+        BackgroundTransparency = 0.4,
+        BorderSizePixel = 0,
+        Parent = entry,
+    })
+    addCorner(2, accentBar)
+
+    -- Command syntax in Code font
+    createElement("TextLabel", {
+        Size = UDim2.new(1, -16, 0, 15),
+        Position = UDim2.new(0, 10, 0, hasDesc and 3 or 6),
+        BackgroundTransparency = 1,
+        Text = cmdSyntax,
         TextColor3 = Theme.txt,
-        TextSize = 13,
-        Font = Enum.Font.GothamMedium,
+        TextSize = 12,
+        Font = Enum.Font.Code,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = entry,
     })
 
-    -- Description (if provided)
-    if description and description ~= "" then
+    -- Description
+    if hasDesc then
         createElement("TextLabel", {
-            Size = UDim2.new(1, -16, 0, 14),
-            Position = UDim2.new(0, 10, 0, 20),
+            Size = UDim2.new(1, -16, 0, 13),
+            Position = UDim2.new(0, 10, 0, 19),
             BackgroundTransparency = 1,
-            Text = description,
+            Text = cleanDesc,
             TextColor3 = Theme.txtFaint,
             TextSize = 10,
-            Font = Enum.Font.Gotham,
+            Font = Enum.Font.Code,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
             Parent = entry,
@@ -1585,22 +1725,18 @@ local function buildCmdEntry(name, description)
     -- Hover effect
     entry.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement then
-            playTween(entry, Tweens.fast, {
-                BackgroundColor3 = Theme.surfHov,
-                BackgroundTransparency = 0.15,
-            })
+            playTween(entry, Tweens.fast, { BackgroundTransparency = 0.05 })
+            playTween(accentBar, Tweens.fast, { BackgroundTransparency = 0 })
         end
     end)
     entry.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseMovement then
-            playTween(entry, Tweens.fast, {
-                BackgroundColor3 = Theme.surface,
-                BackgroundTransparency = Theme.surfaceT,
-            })
+            playTween(entry, Tweens.fast, { BackgroundTransparency = 0.2 })
+            playTween(accentBar, Tweens.fast, { BackgroundTransparency = 0.4 })
         end
     end)
 
-    -- Click to execute (toggle commands) or fill input bar
+    -- Click to execute or fill input bar
     local clickBtn = createElement("TextButton", {
         Size = UDim2.new(1, 0, 1, 0),
         BackgroundTransparency = 1,
@@ -1610,7 +1746,6 @@ local function buildCmdEntry(name, description)
     })
     clickBtn.MouseButton1Click:Connect(function()
         playSfx(sfxClick)
-        -- For toggle commands (no required args), execute directly
         local cmdFunc = commands[name] or commands["!" .. name]
         if cmdFunc then
             local ok, err = pcall(cmdFunc, {}, "")
@@ -1620,7 +1755,6 @@ local function buildCmdEntry(name, description)
                 showNotification("Error", "!" .. name .. " failed: " .. tostring(err), 3)
             end
         else
-            -- Fill input bar with command name for user to add args
             cmdInput.Text = "!" .. name .. " "
             cmdInput:CaptureFocus()
         end
@@ -1757,27 +1891,53 @@ task.spawn(function()
     local hashStr = tostring(#rawDescendants) .. ":" .. tostring(serverTime) .. ":0"
     local hash = computeHash(hashStr)
 
-    -- Register commands into UI + command table
+    -- Register commands into UI + command table (categorized PxTag-style)
     local function registerCmds(result)
-        if type(result) == "table" then
-            local count = 0
-            for name, handler in pairs(result) do
-                local cmdKey = "!" .. name
-                if type(handler) == "function" then
-                    commands[cmdKey] = handler
-                    commands[name] = handler
-                    buildCmdEntry(name)
-                    count = count + 1
-                elseif type(handler) == "table" and handler.fn then
-                    commands[cmdKey] = handler.fn
-                    commands[name] = handler.fn
-                    buildCmdEntry(name, handler.desc or "")
-                    count = count + 1
+        if type(result) ~= "table" then return 0 end
+
+        local count = 0
+        local categorized = {}
+        for _, cat in ipairs(CAT_ORDER) do categorized[cat] = {} end
+
+        -- First pass: register all commands and sort into categories
+        for name, handler in pairs(result) do
+            local cmdKey = "!" .. name
+            local fn, desc
+            if type(handler) == "function" then
+                fn = handler; desc = ""
+            elseif type(handler) == "table" and handler.fn then
+                fn = handler.fn; desc = handler.desc or ""
+            end
+            if fn then
+                commands[cmdKey] = fn
+                commands[name] = fn
+                local cat = CMD_CATEGORIES[name] or "Other"
+                if not categorized[cat] then categorized[cat] = {} end
+                table.insert(categorized[cat], { name = name, desc = desc })
+                count = count + 1
+            end
+        end
+
+        -- Sort each category alphabetically
+        for _, cat in ipairs(CAT_ORDER) do
+            if categorized[cat] then
+                table.sort(categorized[cat], function(a, b) return a.name < b.name end)
+            end
+        end
+
+        -- Second pass: build categorized UI
+        catLayoutOrder = 0
+        for _, cat in ipairs(CAT_ORDER) do
+            local entries = categorized[cat]
+            if entries and #entries > 0 then
+                buildCatHeader(cat, CAT_COLORS[cat])
+                for _, e in ipairs(entries) do
+                    buildCmdEntry(e.name, e.desc, CAT_COLORS[cat])
                 end
             end
-            return count
         end
-        return 0
+
+        return count
     end
 
     local cmdsLoaded = false
@@ -1951,7 +2111,7 @@ task.spawn(function()
                 if d.Name == "Baseplate" and d:IsA("BasePart") then
                     local y = d.Size.Y
                     local bg = math.max(d.Size.X, d.Size.Z)
-                    d.Size = Vector3.new(math.max(bg * 1e9, 1e12), y, math.max(bg * 1e9, 1e12))
+                    d.Size = Vector3.new(math.max(bg * 4, 2048), y, math.max(bg * 4, 2048))
                     break
                 end
             end
