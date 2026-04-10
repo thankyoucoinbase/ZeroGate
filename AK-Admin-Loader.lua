@@ -91,26 +91,27 @@ end)
 -- THEME (AK Admin blue glass style)
 ------------------------------------------------------------
 local Theme = {
-    bg        = Color3.fromRGB(22, 36, 58),
-    bgDark    = Color3.fromRGB(16, 28, 48),
-    panel     = Color3.fromRGB(28, 44, 68),
-    surface   = Color3.fromRGB(34, 52, 78),
-    surfHov   = Color3.fromRGB(42, 62, 92),
-    border    = Color3.fromRGB(50, 72, 105),
-    borderDim = Color3.fromRGB(38, 58, 88),
-    accent    = Color3.fromRGB(80, 160, 255),
-    accentDim = Color3.fromRGB(60, 120, 200),
-    txt       = Color3.fromRGB(220, 230, 245),
-    txtSub    = Color3.fromRGB(140, 165, 200),
-    txtFaint  = Color3.fromRGB(90, 115, 155),
+    bg        = Color3.fromRGB(14, 14, 17),
+    bgDark    = Color3.fromRGB(10, 10, 13),
+    panel     = Color3.fromRGB(30, 30, 32),
+    surface   = Color3.fromRGB(22, 22, 28),
+    surfHov   = Color3.fromRGB(30, 30, 40),
+    border    = Color3.fromRGB(55, 55, 60),
+    borderDim = Color3.fromRGB(40, 40, 48),
+    accent    = Color3.fromRGB(60, 120, 220),
+    accentDim = Color3.fromRGB(45, 90, 170),
+    txt       = Color3.fromRGB(220, 220, 220),
+    txtSub    = Color3.fromRGB(150, 150, 160),
+    txtFaint  = Color3.fromRGB(110, 110, 125),
     white     = Color3.fromRGB(255, 255, 255),
-    red       = Color3.fromRGB(220, 70, 70),
-    green     = Color3.fromRGB(80, 220, 120),
-    yellow    = Color3.fromRGB(220, 185, 50),
+    red       = Color3.fromRGB(200, 60, 60),
+    green     = Color3.fromRGB(60, 180, 100),
+    yellow    = Color3.fromRGB(200, 170, 60),
+    divider   = Color3.fromRGB(45, 45, 55),
     -- transparencies
-    bgT       = 0.12,
-    panelT    = 0.08,
-    surfaceT  = 0.25,
+    bgT       = 0.02,
+    panelT    = 0.0,
+    surfaceT  = 0.1,
 }
 
 ------------------------------------------------------------
@@ -270,37 +271,26 @@ local screenGui = createElement("ScreenGui", {
 })
 
 ------------------------------------------------------------
--- MAIN WINDOW (blue glass panel - 300x420)
+-- MAIN WINDOW (dark panel - PxTag style)
 ------------------------------------------------------------
-local WIN_W = 300
+local WIN_W = 320
 local WIN_H = 420
-local TITLE_H = 42
-local SEARCH_H = 36
-local CORNER = 12
+local TITLE_H = 36
+local SEARCH_H = 32
+local CORNER = 14
 
 local mainFrame = createElement("Frame", {
     Name = "MainFrame",
     Size = UDim2.new(0, WIN_W, 0, WIN_H),
     Position = UDim2.new(0.5, -(WIN_W/2), 0.5, -(WIN_H/2)),
-    BackgroundColor3 = Theme.bg,
-    BackgroundTransparency = Theme.bgT,
+    BackgroundColor3 = Theme.panel,
+    BackgroundTransparency = 0,
     BorderSizePixel = 0,
     ClipsDescendants = true,
     Parent = screenGui,
 })
 addCorner(CORNER, mainFrame)
-addStroke(Theme.border, 0.3, mainFrame, 1.5)
-
--- Gradient overlay for the glass effect
-local gradient = createElement("UIGradient", {
-    Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 55, 85)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(25, 42, 68)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(18, 32, 55)),
-    }),
-    Rotation = 160,
-    Parent = mainFrame,
-})
+addStroke(Theme.border, 0, mainFrame, 1.2)
 
 ------------------------------------------------------------
 -- TITLE BAR
@@ -308,56 +298,26 @@ local gradient = createElement("UIGradient", {
 local titleBar = createElement("Frame", {
     Name = "TitleBar",
     Size = UDim2.new(1, 0, 0, TITLE_H),
-    BackgroundTransparency = 1,
+    BackgroundColor3 = Theme.panel,
+    BackgroundTransparency = 0,
     BorderSizePixel = 0,
     Parent = mainFrame,
 })
-
--- AK Logo icon
-local logoIcon = createElement("ImageLabel", {
-    Name = "LogoIcon",
-    Size = UDim2.new(0, 24, 0, 24),
-    Position = UDim2.new(0, 12, 0.5, 0),
-    AnchorPoint = Vector2.new(0, 0.5),
-    BackgroundTransparency = 1,
-    Image = "rbxassetid://132440478962916",
-    ImageColor3 = Theme.accent,
-    ScaleType = Enum.ScaleType.Fit,
-    Parent = titleBar,
-})
+addCorner(CORNER, titleBar)
 
 -- Title text
 local titleLabel = createElement("TextLabel", {
     Name = "TitleLabel",
-    Size = UDim2.new(1, -120, 1, 0),
-    Position = UDim2.new(0, 42, 0, 0),
+    Size = UDim2.new(1, -70, 1, 0),
+    Position = UDim2.new(0, 12, 0, 0),
     BackgroundTransparency = 1,
-    Text = "AK Commands",
+    Text = "AK Admin",
     TextColor3 = Theme.txt,
-    TextSize = 16,
-    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    Font = Enum.Font.Code,
     TextXAlignment = Enum.TextXAlignment.Left,
     Parent = titleBar,
 })
-
--- Settings button (gear)
-local settingsBtn = createElement("ImageButton", {
-    Name = "SettingsBtn",
-    Size = UDim2.new(0, 20, 0, 20),
-    Position = UDim2.new(1, -72, 0.5, 0),
-    AnchorPoint = Vector2.new(0, 0.5),
-    BackgroundTransparency = 1,
-    Image = "rbxassetid://73577105416536",
-    ImageColor3 = Theme.txtSub,
-    AutoButtonColor = false,
-    Parent = titleBar,
-})
-settingsBtn.MouseEnter:Connect(function()
-    playTween(settingsBtn, Tweens.fast, { ImageColor3 = Theme.txt })
-end)
-settingsBtn.MouseLeave:Connect(function()
-    playTween(settingsBtn, Tweens.fast, { ImageColor3 = Theme.txtSub })
-end)
 
 -- Minimize button
 local minimizeBtn = createElement("TextButton", {
@@ -368,8 +328,8 @@ local minimizeBtn = createElement("TextButton", {
     BackgroundTransparency = 1,
     Text = "-",
     TextColor3 = Theme.txtSub,
-    TextSize = 18,
-    Font = Enum.Font.GothamBold,
+    TextSize = 16,
+    Font = Enum.Font.Code,
     AutoButtonColor = false,
     Parent = titleBar,
 })
@@ -389,8 +349,8 @@ local closeBtn = createElement("TextButton", {
     BackgroundTransparency = 1,
     Text = "X",
     TextColor3 = Theme.txtSub,
-    TextSize = 14,
-    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    Font = Enum.Font.Code,
     AutoButtonColor = false,
     Parent = titleBar,
 })
@@ -404,10 +364,10 @@ end)
 -- Title separator line
 createElement("Frame", {
     Name = "TitleSep",
-    Size = UDim2.new(1, -24, 0, 1),
-    Position = UDim2.new(0, 12, 0, TITLE_H),
-    BackgroundColor3 = Theme.border,
-    BackgroundTransparency = 0.5,
+    Size = UDim2.new(1, -16, 0, 1),
+    Position = UDim2.new(0, 8, 0, TITLE_H),
+    BackgroundColor3 = Theme.divider,
+    BackgroundTransparency = 0,
     BorderSizePixel = 0,
     Parent = mainFrame,
 })
@@ -417,41 +377,28 @@ createElement("Frame", {
 ------------------------------------------------------------
 local searchContainer = createElement("Frame", {
     Name = "SearchContainer",
-    Size = UDim2.new(1, -24, 0, SEARCH_H),
-    Position = UDim2.new(0, 12, 0, TITLE_H + 8),
-    BackgroundColor3 = Theme.bgDark,
-    BackgroundTransparency = 0.3,
+    Size = UDim2.new(1, -16, 0, SEARCH_H),
+    Position = UDim2.new(0, 8, 0, TITLE_H + 6),
+    BackgroundColor3 = Theme.surface,
+    BackgroundTransparency = 0,
     BorderSizePixel = 0,
     Parent = mainFrame,
 })
 addCorner(8, searchContainer)
-addStroke(Theme.borderDim, 0.4, searchContainer)
-
--- Search icon
-createElement("TextLabel", {
-    Name = "SearchIcon",
-    Size = UDim2.new(0, 24, 1, 0),
-    Position = UDim2.new(0, 8, 0, 0),
-    BackgroundTransparency = 1,
-    Text = "Q",
-    TextColor3 = Theme.txtFaint,
-    TextSize = 14,
-    Font = Enum.Font.GothamBold,
-    Parent = searchContainer,
-})
+addStroke(Theme.borderDim, 0.5, searchContainer)
 
 -- Search input
 local searchInput = createElement("TextBox", {
     Name = "SearchInput",
-    Size = UDim2.new(1, -40, 1, 0),
-    Position = UDim2.new(0, 32, 0, 0),
+    Size = UDim2.new(1, -16, 1, 0),
+    Position = UDim2.new(0, 8, 0, 0),
     BackgroundTransparency = 1,
     Text = "",
     TextColor3 = Theme.txt,
     PlaceholderColor3 = Theme.txtFaint,
-    PlaceholderText = "Search Commands (0)",
-    TextSize = 13,
-    Font = Enum.Font.GothamMedium,
+    PlaceholderText = "Search (0)",
+    TextSize = 11,
+    Font = Enum.Font.Code,
     TextXAlignment = Enum.TextXAlignment.Left,
     ClearTextOnFocus = false,
     Parent = searchContainer,
@@ -460,31 +407,31 @@ local searchInput = createElement("TextBox", {
 ------------------------------------------------------------
 -- COMMAND INPUT BAR (bottom of window)
 ------------------------------------------------------------
-local CMD_INPUT_H = 34
+local CMD_INPUT_H = 30
 
 local cmdInputBar = createElement("Frame", {
     Name = "CmdInputBar",
-    Size = UDim2.new(1, -20, 0, CMD_INPUT_H),
+    Size = UDim2.new(1, -16, 0, CMD_INPUT_H),
     AnchorPoint = Vector2.new(0, 1),
-    Position = UDim2.new(0, 10, 1, -8),
-    BackgroundColor3 = Theme.bgDark,
-    BackgroundTransparency = 0.3,
+    Position = UDim2.new(0, 8, 1, -6),
+    BackgroundColor3 = Theme.surface,
+    BackgroundTransparency = 0,
     BorderSizePixel = 0,
     ZIndex = 5,
     Parent = mainFrame,
 })
 addCorner(8, cmdInputBar)
-addStroke(Theme.borderDim, 0.4, cmdInputBar)
+addStroke(Theme.borderDim, 0.5, cmdInputBar)
 
 createElement("TextLabel", {
     Name = "CmdPrefix",
-    Size = UDim2.new(0, 18, 1, 0),
-    Position = UDim2.new(0, 8, 0, 0),
+    Size = UDim2.new(0, 14, 1, 0),
+    Position = UDim2.new(0, 6, 0, 0),
     BackgroundTransparency = 1,
     Text = ">",
     TextColor3 = Theme.accent,
-    TextSize = 14,
-    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    Font = Enum.Font.Code,
     TextXAlignment = Enum.TextXAlignment.Left,
     ZIndex = 6,
     Parent = cmdInputBar,
@@ -492,15 +439,15 @@ createElement("TextLabel", {
 
 local cmdInput = createElement("TextBox", {
     Name = "CmdInput",
-    Size = UDim2.new(1, -32, 1, 0),
-    Position = UDim2.new(0, 26, 0, 0),
+    Size = UDim2.new(1, -26, 1, 0),
+    Position = UDim2.new(0, 20, 0, 0),
     BackgroundTransparency = 1,
     Text = "",
     TextColor3 = Theme.txt,
     PlaceholderColor3 = Theme.txtFaint,
     PlaceholderText = "Type a command...",
-    TextSize = 13,
-    Font = Enum.Font.GothamMedium,
+    TextSize = 11,
+    Font = Enum.Font.Code,
     TextXAlignment = Enum.TextXAlignment.Left,
     ClearTextOnFocus = false,
     ZIndex = 6,
@@ -510,31 +457,33 @@ local cmdInput = createElement("TextBox", {
 ------------------------------------------------------------
 -- COMMAND SCROLL LIST
 ------------------------------------------------------------
-local scrollTop = TITLE_H + SEARCH_H + 14
-local scrollBottom = CMD_INPUT_H + 18
+local scrollTop = TITLE_H + SEARCH_H + 10
+local scrollBottom = CMD_INPUT_H + 12
 
 local cmdScroll = createElement("ScrollingFrame", {
     Name = "CmdScroll",
-    Size = UDim2.new(1, -20, 1, -(scrollTop + scrollBottom)),
-    Position = UDim2.new(0, 10, 0, scrollTop),
-    BackgroundTransparency = 1,
+    Size = UDim2.new(1, -12, 1, -(scrollTop + scrollBottom)),
+    Position = UDim2.new(0, 6, 0, scrollTop),
+    BackgroundColor3 = Theme.bg,
+    BackgroundTransparency = 0,
     BorderSizePixel = 0,
-    ScrollBarThickness = 4,
-    ScrollBarImageColor3 = Theme.border,
+    ScrollBarThickness = 3,
+    ScrollBarImageColor3 = Theme.accentDim,
     ScrollBarImageTransparency = 0.3,
     CanvasSize = UDim2.new(0, 0, 0, 0),
     AutomaticCanvasSize = Enum.AutomaticSize.Y,
     Parent = mainFrame,
 })
+addCorner(8, cmdScroll)
 
 addListLayout(
     Enum.FillDirection.Vertical,
     Enum.HorizontalAlignment.Center,
     nil,
-    3,
+    0,
     cmdScroll
 )
-addPadding(3, 3, 3, 3, cmdScroll)
+addPadding(4, 4, 4, 4, cmdScroll)
 
 ------------------------------------------------------------
 -- TOP-RIGHT STATUS BAR
@@ -1415,28 +1364,26 @@ searchInput:GetPropertyChangedSignal("Text"):Connect(function()
     local query = string.lower(searchInput.Text)
     local catHasVisible = {}
 
-    -- First pass: show/hide command entries
+    -- First pass: show/hide command entries (TextButtons)
     for _, child in ipairs(cmdScroll:GetChildren()) do
-        if child:IsA("Frame") and child.Name ~= "" then
+        if child:IsA("TextButton") and child.Name ~= "" then
             local n = child.Name
-            if string.sub(n, 1, 4) ~= "CAT_" then
-                if query == "" then
-                    child.Visible = true
+            if query == "" then
+                child.Visible = true
+                local cat = _G._AK_CMD_CATS and _G._AK_CMD_CATS[n]
+                if cat then catHasVisible["CAT_" .. cat] = true end
+            else
+                local vis = string.find(string.lower(n), query, 1, true) ~= nil
+                child.Visible = vis
+                if vis then
                     local cat = _G._AK_CMD_CATS and _G._AK_CMD_CATS[n]
                     if cat then catHasVisible["CAT_" .. cat] = true end
-                else
-                    local vis = string.find(string.lower(n), query, 1, true) ~= nil
-                    child.Visible = vis
-                    if vis then
-                        local cat = _G._AK_CMD_CATS and _G._AK_CMD_CATS[n]
-                        if cat then catHasVisible["CAT_" .. cat] = true end
-                    end
                 end
             end
         end
     end
 
-    -- Second pass: show/hide category headers
+    -- Second pass: show/hide category headers (Frames)
     for _, child in ipairs(cmdScroll:GetChildren()) do
         if child:IsA("Frame") and string.sub(child.Name, 1, 4) == "CAT_" then
             child.Visible = (query == "") or (catHasVisible[child.Name] == true)
@@ -1505,8 +1452,8 @@ local function showNotification(title, body, duration)
         BackgroundTransparency = 1,
         Text = title,
         TextColor3 = Theme.accent,
-        TextSize = 13,
-        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        Font = Enum.Font.Code,
         TextXAlignment = Enum.TextXAlignment.Left,
         ZIndex = 101,
         Parent = notifFrame,
@@ -1519,8 +1466,8 @@ local function showNotification(title, body, duration)
         BackgroundTransparency = 1,
         Text = body,
         TextColor3 = Theme.txtSub,
-        TextSize = 12,
-        Font = Enum.Font.Gotham,
+        TextSize = 11,
+        Font = Enum.Font.Code,
         TextXAlignment = Enum.TextXAlignment.Left,
         TextTruncate = Enum.TextTruncate.AtEnd,
         ZIndex = 101,
@@ -1605,38 +1552,29 @@ _G._AK_CMD_CATS = CMD_CATEGORIES
 local catLayoutOrder = 0
 
 ------------------------------------------------------------
--- CATEGORY HEADER BUILDER
+-- CATEGORY HEADER BUILDER (PxTag style)
 ------------------------------------------------------------
 local function buildCatHeader(title, accentColor)
     catLayoutOrder = catLayoutOrder + 1
     local header = createElement("Frame", {
         Name = "CAT_" .. title,
-        Size = UDim2.new(1, 0, 0, 24),
-        BackgroundColor3 = accentColor,
-        BackgroundTransparency = 0.88,
+        Size = UDim2.new(1, -4, 0, 26),
+        BackgroundColor3 = Theme.surface,
+        BackgroundTransparency = 0,
         BorderSizePixel = 0,
         LayoutOrder = catLayoutOrder,
         Parent = cmdScroll,
     })
-    addCorner(5, header)
-
-    -- Accent bar on left
-    local bar = createElement("Frame", {
-        Size = UDim2.new(0, 3, 0, 14),
-        Position = UDim2.new(0, 4, 0.5, -7),
-        BackgroundColor3 = accentColor,
-        BorderSizePixel = 0,
-        Parent = header,
-    })
-    addCorner(2, bar)
+    addCorner(8, header)
+    addStroke(accentColor, 0.5, header, 1)
 
     createElement("TextLabel", {
-        Size = UDim2.new(1, -18, 1, 0),
-        Position = UDim2.new(0, 12, 0, 0),
+        Size = UDim2.new(1, -12, 1, 0),
+        Position = UDim2.new(0, 10, 0, 0),
         BackgroundTransparency = 1,
-        Text = string.upper(title),
+        Text = title,
         TextColor3 = accentColor,
-        TextSize = 10,
+        TextSize = 11,
         Font = Enum.Font.Code,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = header,
@@ -1646,7 +1584,7 @@ local function buildCatHeader(title, accentColor)
 end
 
 ------------------------------------------------------------
--- COMMAND ENTRY BUILDER (PxTag-style rows)
+-- COMMAND ENTRY BUILDER (PxTag MakeBtn style)
 ------------------------------------------------------------
 local function buildCmdEntry(name, description, accentColor)
     catLayoutOrder = catLayoutOrder + 1
@@ -1667,40 +1605,43 @@ local function buildCmdEntry(name, description, accentColor)
     end
 
     local hasDesc = cleanDesc ~= ""
-    local entryH = hasDesc and 36 or 28
+    local entryH = hasDesc and 34 or 22
 
-    local entry = createElement("Frame", {
+    local entry = createElement("TextButton", {
         Name = name,
-        Size = UDim2.new(1, 0, 0, entryH),
-        BackgroundColor3 = Theme.bgDark,
-        BackgroundTransparency = 0.2,
+        Size = UDim2.new(1, -4, 0, entryH),
+        BackgroundColor3 = Theme.surface,
+        BackgroundTransparency = 0.1,
         BorderSizePixel = 0,
         LayoutOrder = catLayoutOrder,
-        ClipsDescendants = true,
+        Text = "",
+        AutoButtonColor = false,
         Parent = cmdScroll,
     })
-    addCorner(5, entry)
+    addCorner(8, entry)
 
-    -- Left accent bar
+    -- Left accent bar (pill shape, hidden by default like PxTag)
     local accentBar = createElement("Frame", {
         Name = "Accent",
-        Size = UDim2.new(0, 3, 1, -8),
-        Position = UDim2.new(0, 0, 0, 4),
+        Size = UDim2.new(0, 2, 0.65, 0),
+        Position = UDim2.new(0, 0, 0.175, 0),
         BackgroundColor3 = accentColor,
-        BackgroundTransparency = 0.4,
+        BackgroundTransparency = 1,
         BorderSizePixel = 0,
         Parent = entry,
     })
-    addCorner(2, accentBar)
+    local accentCorner = Instance.new("UICorner")
+    accentCorner.CornerRadius = UDim.new(1, 0)
+    accentCorner.Parent = accentBar
 
-    -- Command syntax in Code font
-    createElement("TextLabel", {
-        Size = UDim2.new(1, -16, 0, 15),
-        Position = UDim2.new(0, 10, 0, hasDesc and 3 or 6),
+    -- Command syntax label
+    local cmdLabel = createElement("TextLabel", {
+        Size = UDim2.new(1, -14, 0, 14),
+        Position = UDim2.new(0, 8, 0, hasDesc and 2 or 4),
         BackgroundTransparency = 1,
         Text = cmdSyntax,
-        TextColor3 = Theme.txt,
-        TextSize = 12,
+        TextColor3 = hasDesc and accentColor or Theme.txt,
+        TextSize = 11,
         Font = Enum.Font.Code,
         TextXAlignment = Enum.TextXAlignment.Left,
         Parent = entry,
@@ -1709,12 +1650,12 @@ local function buildCmdEntry(name, description, accentColor)
     -- Description
     if hasDesc then
         createElement("TextLabel", {
-            Size = UDim2.new(1, -16, 0, 13),
-            Position = UDim2.new(0, 10, 0, 19),
+            Size = UDim2.new(1, -14, 0, 12),
+            Position = UDim2.new(0, 8, 0, 18),
             BackgroundTransparency = 1,
             Text = cleanDesc,
             TextColor3 = Theme.txtFaint,
-            TextSize = 10,
+            TextSize = 9,
             Font = Enum.Font.Code,
             TextXAlignment = Enum.TextXAlignment.Left,
             TextTruncate = Enum.TextTruncate.AtEnd,
@@ -1722,30 +1663,51 @@ local function buildCmdEntry(name, description, accentColor)
         })
     end
 
-    -- Hover effect
-    entry.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            playTween(entry, Tweens.fast, { BackgroundTransparency = 0.05 })
-            playTween(accentBar, Tweens.fast, { BackgroundTransparency = 0 })
-        end
+    -- Hover: show accent bar, lighten bg
+    entry.MouseEnter:Connect(function()
+        playTween(entry, Tweens.fast, {
+            BackgroundColor3 = Theme.surfHov,
+            BackgroundTransparency = 0,
+        })
+        playTween(accentBar, TweenInfo.new(0.07, Enum.EasingStyle.Quad), {
+            BackgroundTransparency = 0,
+        })
     end)
-    entry.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            playTween(entry, Tweens.fast, { BackgroundTransparency = 0.2 })
-            playTween(accentBar, Tweens.fast, { BackgroundTransparency = 0.4 })
-        end
+    entry.MouseLeave:Connect(function()
+        playTween(entry, Tweens.fast, {
+            BackgroundColor3 = Theme.surface,
+            BackgroundTransparency = 0.1,
+        })
+        playTween(accentBar, TweenInfo.new(0.10, Enum.EasingStyle.Quad), {
+            BackgroundTransparency = 1,
+        })
     end)
 
-    -- Click to execute or fill input bar
-    local clickBtn = createElement("TextButton", {
-        Size = UDim2.new(1, 0, 1, 0),
-        BackgroundTransparency = 1,
-        Text = "",
-        ZIndex = 3,
-        Parent = entry,
-    })
-    clickBtn.MouseButton1Click:Connect(function()
+    -- Click: flash accent color, then execute
+    entry.Activated:Connect(function()
         playSfx(sfxClick)
+
+        -- Flash effect
+        playTween(entry, TweenInfo.new(0.04, Enum.EasingStyle.Quad), {
+            BackgroundColor3 = accentColor,
+            BackgroundTransparency = 0.3,
+        })
+        playTween(accentBar, TweenInfo.new(0.04, Enum.EasingStyle.Quad), {
+            BackgroundTransparency = 0,
+        })
+        task.delay(0.12, function()
+            pcall(function()
+                playTween(entry, Tweens.fast, {
+                    BackgroundColor3 = Theme.surface,
+                    BackgroundTransparency = 0.1,
+                })
+                playTween(accentBar, TweenInfo.new(0.10, Enum.EasingStyle.Quad), {
+                    BackgroundTransparency = 1,
+                })
+            end)
+        end)
+
+        -- Execute or fill
         local cmdFunc = commands[name] or commands["!" .. name]
         if cmdFunc then
             local ok, err = pcall(cmdFunc, {}, "")
