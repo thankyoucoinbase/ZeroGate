@@ -114,6 +114,39 @@ local Theme = {
 }
 
 ------------------------------------------------------------
+-- EXECUTOR DETECTION
+------------------------------------------------------------
+local executorName = "Unknown"
+local executorAccent = Theme.accent
+do
+    local ok, name = pcall(function()
+        if identifyexecutor then return identifyexecutor() end
+        return nil
+    end)
+    if ok and name then
+        executorName = name
+        local brandColors = {
+            Delta     = Color3.fromRGB(160, 80, 255),
+            Xeno      = Color3.fromRGB(255, 80, 200),
+            Velocity  = Color3.fromRGB(220, 220, 235),
+            Potassium = Color3.fromRGB(60, 210, 200),
+            Solara    = Color3.fromRGB(255, 165, 50),
+            Volt      = Color3.fromRGB(100, 180, 255),
+            Wave      = Color3.fromRGB(100, 200, 255),
+            Synapse   = Color3.fromRGB(255, 50, 50),
+            Fluxus    = Color3.fromRGB(80, 160, 255),
+            Zenith    = Color3.fromRGB(130, 200, 255),
+        }
+        for bname, color in pairs(brandColors) do
+            if string.find(name, bname, 1, true) then
+                executorAccent = color
+                break
+            end
+        end
+    end
+end
+
+------------------------------------------------------------
 -- TWEEN PRESETS
 ------------------------------------------------------------
 local Tweens = {
@@ -425,13 +458,64 @@ local searchInput = createElement("TextBox", {
 })
 
 ------------------------------------------------------------
+-- COMMAND INPUT BAR (bottom of window)
+------------------------------------------------------------
+local CMD_INPUT_H = 34
+
+local cmdInputBar = createElement("Frame", {
+    Name = "CmdInputBar",
+    Size = UDim2.new(1, -20, 0, CMD_INPUT_H),
+    AnchorPoint = Vector2.new(0, 1),
+    Position = UDim2.new(0, 10, 1, -8),
+    BackgroundColor3 = Theme.bgDark,
+    BackgroundTransparency = 0.3,
+    BorderSizePixel = 0,
+    ZIndex = 5,
+    Parent = mainFrame,
+})
+addCorner(8, cmdInputBar)
+addStroke(Theme.borderDim, 0.4, cmdInputBar)
+
+createElement("TextLabel", {
+    Name = "CmdPrefix",
+    Size = UDim2.new(0, 18, 1, 0),
+    Position = UDim2.new(0, 8, 0, 0),
+    BackgroundTransparency = 1,
+    Text = ">",
+    TextColor3 = Theme.accent,
+    TextSize = 14,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 6,
+    Parent = cmdInputBar,
+})
+
+local cmdInput = createElement("TextBox", {
+    Name = "CmdInput",
+    Size = UDim2.new(1, -32, 1, 0),
+    Position = UDim2.new(0, 26, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "",
+    TextColor3 = Theme.txt,
+    PlaceholderColor3 = Theme.txtFaint,
+    PlaceholderText = "Type a command...",
+    TextSize = 13,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ClearTextOnFocus = false,
+    ZIndex = 6,
+    Parent = cmdInputBar,
+})
+
+------------------------------------------------------------
 -- COMMAND SCROLL LIST
 ------------------------------------------------------------
-local scrollTop = TITLE_H + SEARCH_H + 20
+local scrollTop = TITLE_H + SEARCH_H + 14
+local scrollBottom = CMD_INPUT_H + 18
 
 local cmdScroll = createElement("ScrollingFrame", {
     Name = "CmdScroll",
-    Size = UDim2.new(1, -20, 1, -(scrollTop + 8)),
+    Size = UDim2.new(1, -20, 1, -(scrollTop + scrollBottom)),
     Position = UDim2.new(0, 10, 0, scrollTop),
     BackgroundTransparency = 1,
     BorderSizePixel = 0,
@@ -451,6 +535,580 @@ addListLayout(
     cmdScroll
 )
 addPadding(2, 2, 2, 2, cmdScroll)
+
+------------------------------------------------------------
+-- TOP-RIGHT STATUS BAR
+------------------------------------------------------------
+local SB_H = 42
+local SB_ICON = 32
+local SB_GAP = 6
+
+local statusBar = createElement("Frame", {
+    Name = "AKStatusBar",
+    Size = UDim2.new(0, 0, 0, SB_H),
+    AnchorPoint = Vector2.new(1, 0),
+    Position = UDim2.new(1, -10, 0, 10),
+    BackgroundTransparency = 1,
+    AutomaticSize = Enum.AutomaticSize.X,
+    Parent = screenGui,
+})
+
+addListLayout(
+    Enum.FillDirection.Horizontal,
+    Enum.HorizontalAlignment.Right,
+    Enum.VerticalAlignment.Center,
+    SB_GAP,
+    statusBar
+)
+
+-- Icon button helper
+local function makeStatusIcon(name, icon, layoutOrder, callback)
+    local btn = createElement("ImageButton", {
+        Name = name,
+        Size = UDim2.new(0, SB_ICON, 0, SB_ICON),
+        BackgroundColor3 = Theme.bg,
+        BackgroundTransparency = 0.25,
+        BorderSizePixel = 0,
+        Image = icon,
+        ImageColor3 = Theme.txtSub,
+        ScaleType = Enum.ScaleType.Fit,
+        AutoButtonColor = false,
+        LayoutOrder = layoutOrder,
+        Parent = statusBar,
+    })
+    addCorner(8, btn)
+    addPadding(6, 6, 6, 6, btn)
+
+    btn.MouseEnter:Connect(function()
+        playTween(btn, Tweens.fast, { ImageColor3 = Theme.white, BackgroundTransparency = 0.1 })
+    end)
+    btn.MouseLeave:Connect(function()
+        playTween(btn, Tweens.fast, { ImageColor3 = Theme.txtSub, BackgroundTransparency = 0.25 })
+    end)
+    if callback then
+        btn.MouseButton1Click:Connect(callback)
+    end
+    return btn
+end
+
+-- WiFi / connection icon
+makeStatusIcon("WiFiBtn", "rbxassetid://6031094670", 1, function()
+    showNotification("AK ADMIN", "Connected to server", 2)
+end)
+
+-- Tag selector icon (the bird/chicken)
+local tagSelectorBtn = makeStatusIcon("TagBtn", "rbxassetid://6034287594", 2)
+
+-- AK logo icon
+local akLogoBtn = makeStatusIcon("AKLogoBtn", "rbxassetid://132440478962916", 3, function()
+    windowVisible = not windowVisible
+    mainFrame.Visible = windowVisible
+end)
+akLogoBtn.ImageColor3 = Theme.accent
+
+-- Status info panel (right side)
+local statusInfo = createElement("Frame", {
+    Name = "StatusInfo",
+    Size = UDim2.new(0, 140, 0, SB_H),
+    BackgroundColor3 = Theme.bg,
+    BackgroundTransparency = 0.25,
+    BorderSizePixel = 0,
+    LayoutOrder = 4,
+    Parent = statusBar,
+})
+addCorner(8, statusInfo)
+
+-- Green dot
+local greenDot = createElement("Frame", {
+    Name = "GreenDot",
+    Size = UDim2.new(0, 8, 0, 8),
+    Position = UDim2.new(0, 10, 0, 10),
+    BackgroundColor3 = Theme.green,
+    BorderSizePixel = 0,
+    Parent = statusInfo,
+})
+addCorner(4, greenDot)
+playTween(greenDot, Tweens.pulse, { BackgroundColor3 = Color3.fromRGB(130, 255, 160) })
+
+-- "AK ACTIVE" label
+createElement("TextLabel", {
+    Name = "ActiveLabel",
+    Size = UDim2.new(0, 80, 0, 14),
+    Position = UDim2.new(0, 22, 0, 6),
+    BackgroundTransparency = 1,
+    Text = "AK ACTIVE",
+    TextColor3 = Theme.txt,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = statusInfo,
+})
+
+-- FPS counter
+local fpsLabel = createElement("TextLabel", {
+    Name = "FPSLabel",
+    Size = UDim2.new(0, 55, 0, 12),
+    Position = UDim2.new(0, 10, 0, 24),
+    BackgroundTransparency = 1,
+    Text = "FPS: --",
+    TextColor3 = Theme.txtFaint,
+    TextSize = 11,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    Parent = statusInfo,
+})
+
+-- Executor name label
+createElement("TextLabel", {
+    Name = "ExecLabel",
+    Size = UDim2.new(0, 65, 0, 12),
+    Position = UDim2.new(0, 68, 0, 24),
+    BackgroundTransparency = 1,
+    Text = executorName,
+    TextColor3 = Theme.txtFaint,
+    TextSize = 11,
+    Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Right,
+    Parent = statusInfo,
+})
+
+-- Dropdown arrow
+local dropArrow = createElement("TextButton", {
+    Name = "DropArrow",
+    Size = UDim2.new(1, -8, 0, 10),
+    AnchorPoint = Vector2.new(0, 1),
+    Position = UDim2.new(0, 4, 1, -2),
+    BackgroundColor3 = Theme.border,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+    Text = "V",
+    TextColor3 = Theme.txtFaint,
+    TextSize = 8,
+    Font = Enum.Font.GothamBold,
+    AutoButtonColor = false,
+    Parent = statusInfo,
+})
+addCorner(4, dropArrow)
+
+-- FPS updater
+task.spawn(function()
+    local lastTime = tick()
+    local frames = 0
+    RunService.Heartbeat:Connect(function()
+        frames = frames + 1
+        local now = tick()
+        if now - lastTime >= 1 then
+            pcall(function()
+                fpsLabel.Text = "FPS: " .. tostring(frames)
+            end)
+            frames = 0
+            lastTime = now
+        end
+    end)
+end)
+
+------------------------------------------------------------
+-- OVERHEAD TAG SYSTEM
+------------------------------------------------------------
+local TAG_PRESETS = {
+    { name = "AK STAFF",  icon = "rbxassetid://6031280882", color = Color3.fromRGB(90, 90, 95) },
+    { name = "AK ADMIN",  icon = "rbxassetid://6031094670", color = Color3.fromRGB(50, 90, 160) },
+    { name = "AK VIP",    icon = "rbxassetid://6034287594", color = Color3.fromRGB(180, 140, 40) },
+    { name = "AK USER",   icon = "rbxassetid://6034509993", color = Color3.fromRGB(60, 130, 100) },
+    { name = "OWNER",     icon = "rbxassetid://6031094670", color = Color3.fromRGB(160, 50, 50) },
+}
+
+local currentTag = nil -- the BillboardGui instance
+local currentTagPreset = nil -- which preset is active (for respawn + broadcast)
+local remoteTags = {} -- userId -> BillboardGui (tags on other players)
+
+-- Signal prefix: AK tag broadcasts use this pattern in chat
+-- Format: "aktag:<tagIndex>" or "aktag:0" for remove
+-- The message gets Roblox-filtered but other AK clients read the raw text
+local TAG_SIGNAL_PREFIX = "aktag:"
+
+local function removeTag()
+    if currentTag then
+        currentTag:Destroy()
+        currentTag = nil
+    end
+    currentTagPreset = nil
+end
+
+local function applyTagToHead(head, preset, playerName)
+    -- Remove existing tag on this head
+    local existing = head:FindFirstChild("AKTag")
+    if existing then existing:Destroy() end
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "AKTag"
+    bb.Size = UDim2.new(0, 160, 0, 50)
+    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.AlwaysOnTop = true
+    bb.Parent = head
+
+    local tagFrame = createElement("Frame", {
+        Name = "TagFrame",
+        Size = UDim2.new(1, 0, 0, 36),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new(0.5, 0, 0.5, 0),
+        BackgroundColor3 = preset.color,
+        BackgroundTransparency = 0.15,
+        BorderSizePixel = 0,
+        Parent = bb,
+    })
+    addCorner(10, tagFrame)
+
+    createElement("ImageLabel", {
+        Size = UDim2.new(0, 18, 0, 18),
+        Position = UDim2.new(0, 8, 0, 4),
+        BackgroundTransparency = 1,
+        Image = preset.icon,
+        ImageColor3 = Theme.white,
+        ScaleType = Enum.ScaleType.Fit,
+        Parent = tagFrame,
+    })
+
+    createElement("TextLabel", {
+        Size = UDim2.new(1, -32, 0, 16),
+        Position = UDim2.new(0, 30, 0, 3),
+        BackgroundTransparency = 1,
+        Text = preset.name,
+        TextColor3 = Theme.white,
+        TextSize = 13,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = tagFrame,
+    })
+
+    createElement("TextLabel", {
+        Size = UDim2.new(1, -32, 0, 12),
+        Position = UDim2.new(0, 30, 0, 19),
+        BackgroundTransparency = 1,
+        Text = "@" .. playerName,
+        TextColor3 = Color3.fromRGB(200, 200, 205),
+        TextSize = 10,
+        Font = Enum.Font.Gotham,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        Parent = tagFrame,
+    })
+
+    return bb
+end
+
+local function applyTag(preset, broadcast)
+    removeTag()
+
+    local char = localPlayer.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    currentTag = applyTagToHead(head, preset, localPlayer.Name)
+    currentTagPreset = preset
+
+    -- Broadcast to other AK Admin users via chat
+    if broadcast ~= false then
+        local tagIndex = 0
+        for i, p in ipairs(TAG_PRESETS) do
+            if p.name == preset.name then
+                tagIndex = i
+                break
+            end
+        end
+        if tagIndex > 0 then
+            pcall(function()
+                local textChatService = getService("TextChatService")
+                local channels = textChatService:FindFirstChild("TextChannels")
+                if channels then
+                    local general = channels:FindFirstChild("RBXGeneral")
+                    if general then
+                        general:SendAsync(TAG_SIGNAL_PREFIX .. tostring(tagIndex))
+                    end
+                end
+            end)
+        end
+    end
+end
+
+-- Apply a remote player's tag (called when we receive their signal)
+local function applyRemoteTag(player, presetIndex)
+    -- Remove existing remote tag for this player
+    if remoteTags[player.UserId] then
+        pcall(function() remoteTags[player.UserId]:Destroy() end)
+        remoteTags[player.UserId] = nil
+    end
+
+    if presetIndex == 0 then return end -- they removed their tag
+
+    local preset = TAG_PRESETS[presetIndex]
+    if not preset then return end
+
+    local char = player.Character
+    if not char then return end
+    local head = char:FindFirstChild("Head")
+    if not head then return end
+
+    remoteTags[player.UserId] = applyTagToHead(head, preset, player.Name)
+end
+
+-- Re-apply own tag when character respawns
+localPlayer.CharacterAdded:Connect(function(char)
+    if currentTagPreset then
+        local savedPreset = currentTagPreset
+        task.wait(0.5)
+        local head = char:WaitForChild("Head", 5)
+        if head then
+            currentTag = applyTagToHead(head, savedPreset, localPlayer.Name)
+            currentTagPreset = savedPreset
+        end
+    end
+end)
+
+-- Re-apply remote tags when other players respawn
+Players.PlayerAdded:Connect(function(player)
+    player.CharacterAdded:Connect(function(char)
+        -- If we had a tag stored for this player, re-apply it
+        if remoteTags[player.UserId] then
+            local presetIndex = nil
+            pcall(function()
+                local tf = remoteTags[player.UserId]:FindFirstChild("TagFrame")
+                if tf then
+                    local tl = tf:FindFirstChildWhichIsA("TextLabel")
+                    if tl then
+                        for i, p in ipairs(TAG_PRESETS) do
+                            if p.name == tl.Text then
+                                presetIndex = i
+                                break
+                            end
+                        end
+                    end
+                end
+            end)
+            if presetIndex then
+                task.wait(0.5)
+                applyRemoteTag(player, presetIndex)
+            end
+        end
+    end)
+end)
+
+-- Also hook existing players' CharacterAdded
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= localPlayer then
+        player.CharacterAdded:Connect(function()
+            if remoteTags[player.UserId] then
+                local presetIndex = nil
+                pcall(function()
+                    local tf = remoteTags[player.UserId]:FindFirstChild("TagFrame")
+                    if tf then
+                        local tl = tf:FindFirstChildWhichIsA("TextLabel")
+                        if tl then
+                            for i, p in ipairs(TAG_PRESETS) do
+                                if p.name == tl.Text then
+                                    presetIndex = i
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end)
+                if presetIndex then
+                    task.wait(0.5)
+                    applyRemoteTag(player, presetIndex)
+                end
+            end
+        end)
+    end
+end
+
+-- Clean up remote tags when players leave
+Players.PlayerRemoving:Connect(function(player)
+    if remoteTags[player.UserId] then
+        pcall(function() remoteTags[player.UserId]:Destroy() end)
+        remoteTags[player.UserId] = nil
+    end
+end)
+
+-- Broadcast own tag on join (so new AK users see existing tags)
+task.delay(3, function()
+    if currentTagPreset then
+        local tagIndex = 0
+        for i, p in ipairs(TAG_PRESETS) do
+            if p.name == currentTagPreset.name then
+                tagIndex = i
+                break
+            end
+        end
+        if tagIndex > 0 then
+            pcall(function()
+                local textChatService = getService("TextChatService")
+                local channels = textChatService:FindFirstChild("TextChannels")
+                if channels then
+                    local general = channels:FindFirstChild("RBXGeneral")
+                    if general then
+                        general:SendAsync(TAG_SIGNAL_PREFIX .. tostring(tagIndex))
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+------------------------------------------------------------
+-- TAG SELECTOR DROPDOWN (opens from bird icon)
+------------------------------------------------------------
+local tagDropdown = createElement("Frame", {
+    Name = "TagDropdown",
+    Size = UDim2.new(0, 160, 0, 0),
+    AnchorPoint = Vector2.new(0.5, 0),
+    Position = UDim2.new(0.5, 0, 1, 4),
+    BackgroundColor3 = Theme.bg,
+    BackgroundTransparency = 0.1,
+    BorderSizePixel = 0,
+    ClipsDescendants = true,
+    Visible = false,
+    ZIndex = 20,
+    Parent = tagSelectorBtn,
+})
+addCorner(8, tagDropdown)
+addStroke(Theme.border, 0.3, tagDropdown)
+
+local tagListLayout = addListLayout(
+    Enum.FillDirection.Vertical,
+    Enum.HorizontalAlignment.Center,
+    nil,
+    3,
+    tagDropdown
+)
+addPadding(4, 4, 4, 4, tagDropdown)
+
+local tagDropOpen = false
+local TAG_ENTRY_H = 30
+local TAG_DROP_H = (#TAG_PRESETS + 1) * (TAG_ENTRY_H + 3) + 8
+
+-- Build tag preset entries
+for i, preset in ipairs(TAG_PRESETS) do
+    local tagEntry = createElement("TextButton", {
+        Name = preset.name,
+        Size = UDim2.new(1, 0, 0, TAG_ENTRY_H),
+        BackgroundColor3 = preset.color,
+        BackgroundTransparency = 0.4,
+        BorderSizePixel = 0,
+        Text = "",
+        AutoButtonColor = false,
+        LayoutOrder = i,
+        ZIndex = 21,
+        Parent = tagDropdown,
+    })
+    addCorner(6, tagEntry)
+
+    createElement("ImageLabel", {
+        Size = UDim2.new(0, 14, 0, 14),
+        Position = UDim2.new(0, 6, 0.5, 0),
+        AnchorPoint = Vector2.new(0, 0.5),
+        BackgroundTransparency = 1,
+        Image = preset.icon,
+        ImageColor3 = Theme.white,
+        ScaleType = Enum.ScaleType.Fit,
+        ZIndex = 22,
+        Parent = tagEntry,
+    })
+
+    createElement("TextLabel", {
+        Size = UDim2.new(1, -26, 1, 0),
+        Position = UDim2.new(0, 24, 0, 0),
+        BackgroundTransparency = 1,
+        Text = preset.name,
+        TextColor3 = Theme.white,
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 22,
+        Parent = tagEntry,
+    })
+
+    tagEntry.MouseEnter:Connect(function()
+        playTween(tagEntry, Tweens.fast, { BackgroundTransparency = 0.2 })
+    end)
+    tagEntry.MouseLeave:Connect(function()
+        playTween(tagEntry, Tweens.fast, { BackgroundTransparency = 0.4 })
+    end)
+    tagEntry.MouseButton1Click:Connect(function()
+        playSfx(sfxClick)
+        applyTag(preset, true)
+        showNotification("AK ADMIN", "Tag set: " .. preset.name, 2)
+        -- close dropdown
+        tagDropOpen = false
+        playTween(tagDropdown, Tweens.slide, { Size = UDim2.new(0, 160, 0, 0) })
+        task.delay(0.25, function() tagDropdown.Visible = false end)
+    end)
+end
+
+-- "Remove Tag" entry
+local removeEntry = createElement("TextButton", {
+    Name = "RemoveTag",
+    Size = UDim2.new(1, 0, 0, TAG_ENTRY_H),
+    BackgroundColor3 = Theme.red,
+    BackgroundTransparency = 0.5,
+    BorderSizePixel = 0,
+    Text = "",
+    AutoButtonColor = false,
+    LayoutOrder = #TAG_PRESETS + 1,
+    ZIndex = 21,
+    Parent = tagDropdown,
+})
+addCorner(6, removeEntry)
+createElement("TextLabel", {
+    Size = UDim2.new(1, -8, 1, 0),
+    Position = UDim2.new(0, 8, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "Remove Tag",
+    TextColor3 = Theme.white,
+    TextSize = 12,
+    Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    ZIndex = 22,
+    Parent = removeEntry,
+})
+removeEntry.MouseEnter:Connect(function()
+    playTween(removeEntry, Tweens.fast, { BackgroundTransparency = 0.3 })
+end)
+removeEntry.MouseLeave:Connect(function()
+    playTween(removeEntry, Tweens.fast, { BackgroundTransparency = 0.5 })
+end)
+removeEntry.MouseButton1Click:Connect(function()
+    playSfx(sfxClick)
+    removeTag()
+    -- Broadcast removal
+    pcall(function()
+        local textChatService = getService("TextChatService")
+        local channels = textChatService:FindFirstChild("TextChannels")
+        if channels then
+            local general = channels:FindFirstChild("RBXGeneral")
+            if general then
+                general:SendAsync(TAG_SIGNAL_PREFIX .. "0")
+            end
+        end
+    end)
+    showNotification("AK ADMIN", "Tag removed", 2)
+    tagDropOpen = false
+    playTween(tagDropdown, Tweens.slide, { Size = UDim2.new(0, 160, 0, 0) })
+    task.delay(0.25, function() tagDropdown.Visible = false end)
+end)
+
+-- Toggle dropdown on bird icon click
+tagSelectorBtn.MouseButton1Click:Connect(function()
+    playSfx(sfxClick)
+    tagDropOpen = not tagDropOpen
+    if tagDropOpen then
+        tagDropdown.Visible = true
+        playTween(tagDropdown, Tweens.slide, { Size = UDim2.new(0, 160, 0, TAG_DROP_H) })
+    else
+        playTween(tagDropdown, Tweens.slide, { Size = UDim2.new(0, 160, 0, 0) })
+        task.delay(0.25, function() tagDropdown.Visible = false end)
+    end
+end)
 
 ------------------------------------------------------------
 -- DRAGGING
@@ -708,6 +1366,32 @@ local function buildCmdEntry(name, description)
         end
     end)
 
+    -- Click to execute (toggle commands) or fill input bar
+    local clickBtn = createElement("TextButton", {
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        Text = "",
+        ZIndex = 3,
+        Parent = entry,
+    })
+    clickBtn.MouseButton1Click:Connect(function()
+        playSfx(sfxClick)
+        -- For toggle commands (no required args), execute directly
+        local cmdFunc = commands[name] or commands["!" .. name]
+        if cmdFunc then
+            local ok, err = pcall(cmdFunc, {}, "")
+            if ok then
+                showNotification("AK ADMIN", "Executed: !" .. name, 2)
+            else
+                showNotification("Error", "!" .. name .. " failed: " .. tostring(err), 3)
+            end
+        else
+            -- Fill input bar with command name for user to add args
+            cmdInput.Text = "!" .. name .. " "
+            cmdInput:CaptureFocus()
+        end
+    end)
+
     return entry
 end
 
@@ -753,7 +1437,19 @@ local function executeCommand(text)
 end
 
 ------------------------------------------------------------
--- CHAT COMMAND HOOK (! prefix in chat)
+-- COMMAND INPUT BAR HANDLER
+------------------------------------------------------------
+cmdInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed and cmdInput.Text ~= "" then
+        local text = cmdInput.Text
+        cmdInput.Text = ""
+        playSfx(sfxOk)
+        executeCommand(text)
+    end
+end)
+
+------------------------------------------------------------
+-- CHAT COMMAND HOOK (! prefix in chat) + TAG SIGNAL LISTENER
 ------------------------------------------------------------
 pcall(function()
     local textChatService = getService("TextChatService")
@@ -761,6 +1457,7 @@ pcall(function()
     if channels then
         local general = channels:FindFirstChild("RBXGeneral")
         if general then
+            -- Local commands (own messages)
             general:ConnectLocal(function(msg)
                 if msg and msg.Text then
                     local text = msg.Text
@@ -768,6 +1465,39 @@ pcall(function()
                         executeCommand(text)
                     end
                 end
+            end)
+
+            -- Listen for ALL messages (including from other players)
+            -- to detect tag signals from other AK Admin users
+            general.MessageReceived:Connect(function(msg)
+                pcall(function()
+                    if not msg or not msg.Text then return end
+                    local text = msg.Text
+
+                    -- Check if this is a tag signal
+                    if string.sub(text, 1, #TAG_SIGNAL_PREFIX) == TAG_SIGNAL_PREFIX then
+                        local tagIndexStr = string.sub(text, #TAG_SIGNAL_PREFIX + 1)
+                        local tagIndex = tonumber(tagIndexStr)
+                        if tagIndex == nil then return end
+
+                        -- Find which player sent this message
+                        local sender = nil
+                        if msg.TextSource then
+                            local senderId = msg.TextSource.UserId
+                            if senderId == localPlayer.UserId then return end -- ignore own
+                            sender = Players:GetPlayerByUserId(senderId)
+                        end
+
+                        if sender then
+                            applyRemoteTag(sender, tagIndex)
+                            if tagIndex > 0 and TAG_PRESETS[tagIndex] then
+                                print("[AK Admin] " .. sender.Name .. " equipped tag: " .. TAG_PRESETS[tagIndex].name)
+                            else
+                                print("[AK Admin] " .. sender.Name .. " removed their tag")
+                            end
+                        end
+                    end
+                end)
             end)
         end
     end
