@@ -17,7 +17,7 @@ _G.AK_ADMIN_EXECUTED = true
 ------------------------------------------------------------
 -- URLS
 ------------------------------------------------------------
-local CMDS_URL        = "https://ib2.dev/absent/scripts/cmds.lua"
+local CMDS_URL        = "https://raw.githubusercontent.com/thankyoucoinbase/ZeroGate/refs/heads/main/cmds.lua"
 local BASEPLATE_URL   = "https://ib2.dev/absent/lua/extendedbaseplate.lua"
 local KEY_URL         = "https://absent.wtf/Mains/Key.json"
 local WHITELIST_URL   = "https://absent.wtf/Mains/whitelist.json"
@@ -944,7 +944,7 @@ task.spawn(function()
     local hashStr = tostring(#rawDescendants) .. ":" .. tostring(serverTime) .. ":0"
     local hash = computeHash(hashStr)
 
-    -- Load commands: prefer local file (remote command scripts are dead)
+    -- Load commands from GitHub or local fallback
     local function registerCmds(result)
         if type(result) == "table" then
             local count = 0
@@ -969,26 +969,7 @@ task.spawn(function()
 
     local cmdsLoaded = false
 
-    -- Try local file first (has full inline implementations)
-    pcall(function()
-        if readfile then
-            local localSource = readfile("AKAdmin_cmds.lua")
-            if localSource and localSource ~= "" then
-                local fn = loadstring(localSource)
-                if fn then
-                    local localResult = fn(descendants, serverTime, hash)
-                    local count = registerCmds(localResult)
-                    if count > 0 then
-                        cmdsLoaded = true
-                        showNotification("AK ADMIN", count .. " commands loaded", 3)
-                        print("[AK Admin] Loaded " .. count .. " commands from local AKAdmin_cmds.lua")
-                    end
-                end
-            end
-        end
-    end)
-
-    -- Fallback: try remote cmds.lua (may not work if server scripts are removed)
+    -- Try remote cmds.lua from GitHub first
     if not cmdsLoaded then
         local ok, result = pcall(function()
             local source = game:HttpGet(CMDS_URL)
@@ -1013,6 +994,27 @@ task.spawn(function()
                 if count > 0 then cmdsLoaded = true end
             end
         end
+    end
+
+    -- Fallback: try local file
+    if not cmdsLoaded then
+        pcall(function()
+            if readfile then
+                local localSource = readfile("AKAdmin_cmds.lua")
+                if localSource and localSource ~= "" then
+                    local fn = loadstring(localSource)
+                    if fn then
+                        local localResult = fn(descendants, serverTime, hash)
+                        local count = registerCmds(localResult)
+                        if count > 0 then
+                            cmdsLoaded = true
+                            showNotification("AK ADMIN", count .. " commands loaded (local)", 3)
+                            print("[AK Admin] Loaded " .. count .. " commands from local AKAdmin_cmds.lua")
+                        end
+                    end
+                end
+            end
+        end)
     end
 
     if not cmdsLoaded then
